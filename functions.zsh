@@ -29,11 +29,20 @@ dev_init() {
   command -v docker >/dev/null && docker --version
 }
 
+# In functions.zsh
+
 dev_clean() {
-  echo "🧹 Cleaning dev artifacts"
+  info "Cleaning multi-stack artifacts..."
+  # Node/Next.js
   [[ -d node_modules ]] && rm -rf node_modules
+  [[ -d .next ]] && rm -rf .next
+  # Python
+  find . -type d -name "__pycache__" -exec rm -rf {} +
+  find . -type d -name ".pytest_cache" -exec rm -rf {} +
+  # Go/General
   [[ -d dist ]] && rm -rf dist
   [[ -d build ]] && rm -rf build
+  [[ -f coverage.out ]] && rm coverage.out
 }
 
 dev_health() {

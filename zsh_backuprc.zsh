@@ -46,27 +46,13 @@ zinit wait lucid for \
   changyuheng/zsh-interactive-cd
 
 # ------------------------------------------------------------
-# Utility plugins (lightweight, safe)
-# ------------------------------------------------------------
-# ------------------------------------------------------------
 # Utility plugins (OMZ, correctly loaded via zinit)
 # ------------------------------------------------------------
-
-# sudo !!
-zinit ice pick"plugins/sudo/sudo.plugin.zsh"
-zinit light ohmyzsh/ohmyzsh
-
-# extract archives
-zinit ice pick"plugins/extract/extract.plugin.zsh"
-zinit light ohmyzsh/ohmyzsh
-
-# colored man pages
-zinit ice pick"plugins/colored-man-pages/colored-man-pages.plugin.zsh"
-zinit light ohmyzsh/ohmyzsh
-
-# command-not-found (Ubuntu)
-zinit ice pick"plugins/command-not-found/command-not-found.plugin.zsh"
-zinit light ohmyzsh/ohmyzsh
+zinit wait"0a" lucid for \
+  pick"plugins/sudo/sudo.plugin.zsh" ohmyzsh/ohmyzsh \
+  pick"plugins/extract/extract.plugin.zsh" ohmyzsh/ohmyzsh \
+  pick"plugins/colored-man-pages/colored-man-pages.plugin.zsh" ohmyzsh/ohmyzsh \
+  pick"plugins/command-not-found/command-not-found.plugin.zsh" ohmyzsh/ohmyzsh
 
 # ------------------------------------------------------------
 # Keybindings (AFTER plugins define widgets)
@@ -120,6 +106,11 @@ source "$ZSH_HOME/functions.zsh"
 
 # ------------------------------------------------------------
 # Completion system (cached, hardened)
+# Optimized compinit with 24h cache check
 # ------------------------------------------------------------
 autoload -Uz compinit
-compinit -C -d "$XDG_CACHE_HOME/zsh/zcompdump"
+if [[ -n ${XDG_CACHE_HOME/zsh/zcompdump}(#qN.m-1) ]]; then
+  compinit -C -d "$XDG_CACHE_HOME/zsh/zcompdump"
+else
+  compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
+fi

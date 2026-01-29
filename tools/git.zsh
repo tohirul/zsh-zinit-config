@@ -50,16 +50,17 @@ gcb() {
 }
 
 # ---------- safe cleanup ----------
+# In tools/git.zsh
+
 gclean-merged() {
   _git_guard && _repo_guard || return
-  local base
-  base=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+  # Dynamically find the default branch (main/master/etc)
+  local base=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
   git fetch -p
   git branch --merged "$base" \
-    | grep -Ev "(^\*|$base)" \
+    | grep -Ev "(^\*|$base|dev|staging)" \
     | xargs -r git branch -d
 }
-
 # ---------- stash ----------
 gstash() {
   _git_guard && _repo_guard || return

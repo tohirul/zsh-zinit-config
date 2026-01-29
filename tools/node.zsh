@@ -18,11 +18,19 @@ _pkg_guard() {
 }
 
 # ---------- lazy nvm ----------
+# In tools/node.zsh
+# Define commands that trigger nvm loading
 _load_nvm() {
-  [[ -n "$NVM_DIR" ]] || export NVM_DIR="$HOME/.nvm"
-  [[ -s "$NVM_DIR/nvm.sh" ]] || return 1
-  source "$NVM_DIR/nvm.sh" --no-use
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 }
+
+# Create wrapper functions for lazy activation
+nvm() { unset -f nvm; __load_nvm; nvm "$@" }
+node() { unset -f node; __load_nvm; node "$@" }
+npm() { unset -f npm; __load_nvm; npm "$@" }
+pnpm() { unset -f pnpm; __load_nvm; pnpm "$@" }
+bun() { unset -f bun; __load_nvm; bun "$@" }
 
 nvm_use() {
   _load_nvm || {
