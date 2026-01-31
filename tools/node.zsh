@@ -26,11 +26,11 @@ _load_nvm() {
 }
 
 # Create wrapper functions for lazy activation
-nvm() { unset -f nvm; __load_nvm; nvm "$@" }
-node() { unset -f node; __load_nvm; node "$@" }
-npm() { unset -f npm; __load_nvm; npm "$@" }
-pnpm() { unset -f pnpm; __load_nvm; pnpm "$@" }
-bun() { unset -f bun; __load_nvm; bun "$@" }
+nvm() { unset -f nvm; _load_nvm; nvm "$@" }
+node() { unset -f node; _load_nvm; node "$@" }
+npm() { unset -f npm; _load_nvm; npm "$@" }
+pnpm() { unset -f pnpm; _load_nvm; pnpm "$@" }
+bun() { unset -f bun; _load_nvm; bun "$@" }
 
 nvm_use() {
   _load_nvm || {
