@@ -1,15 +1,28 @@
 # ============================================================
 # OpenCode – Agent-Orchestrated Shell Interface
 # ============================================================
-# This file is a thin adapter ONLY.
-# All logic lives in:
+# This file is a THIN ADAPTER ONLY.
+#
+# All intelligence lives in:
+#   - ~/.agent/skills/vscode-opencode-workflow/SKILL.md
 #   - scripts/*.zsh
-#   - SKILL.md (orchestrator)
 #   - plugins/*
+#
+# Shell responsibilities:
+#   - Guard binaries
+#   - Delegate execution
+#   - Provide ergonomic entrypoints
 # ============================================================
 
 # ------------------------------------------------------------
-# Guards
+# Canonical Workflow Location (from .zshrc)
+# ------------------------------------------------------------
+
+: "${OPENCODE_WORKFLOW_ROOT:?OPENCODE_WORKFLOW_ROOT not set}"
+: "${OPENCODE_WORKFLOW_SCRIPTS:?OPENCODE_WORKFLOW_SCRIPTS not set}"
+
+# ------------------------------------------------------------
+# Guards (NO FALLBACKS)
 # ------------------------------------------------------------
 
 _oc_guard() {
@@ -29,7 +42,8 @@ _code_guard() {
 _script_guard() {
   local script="$1"
   [[ -x "$script" ]] || {
-    echo "[opencode] Script not executable: $script"
+    echo "[opencode] Script not executable:"
+    echo "  $script"
     return 1
   }
 }
@@ -57,45 +71,52 @@ oc_root() {
 
 oc_here_or_root() {
   _oc_guard || return
-  git rev-parse --show-toplevel 2>/dev/null | xargs -r opencode || opencode .
+  git rev-parse --show-toplevel 2>/dev/null \
+    | xargs -r opencode \
+    || opencode .
 }
 
 # ------------------------------------------------------------
-# Workflow-Oriented Commands (Delegation ONLY)
+# Workflow-Oriented Commands (DELEGATION ONLY)
 # ------------------------------------------------------------
 
 oc_detect() {
-  _script_guard "./scripts/detect-project.zsh" || return
-  ./scripts/detect-project.zsh
+  local s="$OPENCODE_WORKFLOW_SCRIPTS/detect-project.zsh"
+  _script_guard "$s" || return
+  "$s"
 }
 
 oc_validate() {
-  _script_guard "./scripts/validate-context.zsh" || return
-  ./scripts/validate-context.zsh
+  local s="$OPENCODE_WORKFLOW_SCRIPTS/validate-context.zsh"
+  _script_guard "$s" || return
+  "$s"
 }
 
 oc_context_generate() {
-  _script_guard "./scripts/generate-context.zsh" || return
-  ./scripts/generate-context.zsh
+  local s="$OPENCODE_WORKFLOW_SCRIPTS/generate-context.zsh"
+  _script_guard "$s" || return
+  "$s"
 }
 
 oc_examples() {
-  _script_guard "./scripts/select-example.zsh" || return
-  ./scripts/select-example.zsh
+  local s="$OPENCODE_WORKFLOW_SCRIPTS/select-example.zsh"
+  _script_guard "$s" || return
+  "$s"
 }
 
 oc_tasks_generate() {
-  _script_guard "./scripts/generate-tasks.zsh" || return
-  ./scripts/generate-tasks.zsh
+  local s="$OPENCODE_WORKFLOW_SCRIPTS/generate-tasks.zsh"
+  _script_guard "$s" || return
+  "$s"
 }
 
 # ------------------------------------------------------------
-# Explicit Review Entrypoints (Plugin-Aligned)
+# Explicit Review Entrypoints (PLUGIN-ALIGNED)
 # ------------------------------------------------------------
 
 oc_review_core() {
   echo "[opencode] Core architecture review requested"
-  echo "→ Use core-review plugin via OpenCode session"
+  echo "→ core-review plugin will be resolved by orchestrator"
   opencode .
 }
 
@@ -112,7 +133,7 @@ oc_review_js() {
 }
 
 # ------------------------------------------------------------
-# Discovery Helpers (Read-only)
+# Discovery Helpers (READ-ONLY)
 # ------------------------------------------------------------
 
 oc_projects() {
