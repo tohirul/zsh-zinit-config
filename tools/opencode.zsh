@@ -14,12 +14,6 @@
 #   - Provide ergonomic entrypoints
 # ============================================================
 
-# ------------------------------------------------------------
-# Canonical Workflow Location (from .zshrc)
-# ------------------------------------------------------------
-
-: "${OPENCODE_WORKFLOW_ROOT:?OPENCODE_WORKFLOW_ROOT not set}"
-: "${OPENCODE_WORKFLOW_SCRIPTS:?OPENCODE_WORKFLOW_SCRIPTS not set}"
 
 # ------------------------------------------------------------
 # Guards (NO FALLBACKS)
