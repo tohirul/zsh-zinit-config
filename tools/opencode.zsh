@@ -1,27 +1,43 @@
 # ============================================================
 # OpenCode – Agent-Orchestrated Shell Interface
 # ============================================================
-# This file is a thin adapter ONLY.
-# All logic lives in:
+# THIN ADAPTER ONLY
+#
+# Intelligence lives in:
+#   - ~/.agent/skills/vscode-opencode-workflow/SKILL.md
+#   - ~/.agent/skills/vscode-opencode-workflow/CONTRACT.md
 #   - scripts/*.zsh
-#   - SKILL.md (orchestrator)
 #   - plugins/*
+#
+# Shell responsibilities:
+#   - Guard binaries
+#   - Guard workflow presence
+#   - Delegate execution
+#   - Provide ergonomic entrypoints
 # ============================================================
 
 # ------------------------------------------------------------
-# Guards
+# Guards (NO FALLBACKS, NO INFERENCE)
 # ------------------------------------------------------------
 
 _oc_guard() {
   command -v opencode >/dev/null 2>&1 || {
-    echo "[opencode] opencode not found"
+    echo "[opencode] ERROR: opencode not found"
     return 1
   }
 }
 
 _code_guard() {
   command -v code >/dev/null 2>&1 || {
-    echo "[opencode] VS Code not found"
+    echo "[opencode] ERROR: VS Code not found"
+    return 1
+  }
+}
+
+_workflow_guard() {
+  [[ -d "$OPENCODE_WORKFLOW_ROOT" ]] || {
+    echo "[opencode] ERROR: Workflow root not found:"
+    echo "  $OPENCODE_WORKFLOW_ROOT"
     return 1
   }
 }
@@ -29,7 +45,8 @@ _code_guard() {
 _script_guard() {
   local script="$1"
   [[ -x "$script" ]] || {
-    echo "[opencode] Script not executable: $script"
+    echo "[opencode] ERROR: Script not executable:"
+    echo "  $script"
     return 1
   }
 }
@@ -57,68 +74,62 @@ oc_root() {
 
 oc_here_or_root() {
   _oc_guard || return
-  git rev-parse --show-toplevel 2>/dev/null | xargs -r opencode || opencode .
+  local root
+  if root=$(git rev-parse --show-toplevel 2>/dev/null); then
+    opencode "$root"
+  else
+    opencode .
+  fi
 }
 
 # ------------------------------------------------------------
-# Workflow-Oriented Commands (Delegation ONLY)
+# Workflow-Oriented Commands (DELEGATION ONLY)
 # ------------------------------------------------------------
 
 oc_detect() {
-  _script_guard "./scripts/detect-project.zsh" || return
-  ./scripts/detect-project.zsh
+  _workflow_guard || return
+  local s="$OPENCODE_WORKFLOW_SCRIPTS/detect-project.zsh"
+  _script_guard "$s" || return
+  "$s"
 }
 
 oc_validate() {
-  _script_guard "./scripts/validate-context.zsh" || return
-  ./scripts/validate-context.zsh
+  _workflow_guard || return
+  local s="$OPENCODE_WORKFLOW_SCRIPTS/validate-context.zsh"
+  _script_guard "$s" || return
+  "$s"
 }
 
 oc_context_generate() {
-  _script_guard "./scripts/generate-context.zsh" || return
-  ./scripts/generate-context.zsh
+  _workflow_guard || return
+  local s="$OPENCODE_WORKFLOW_SCRIPTS/generate-context.zsh"
+  _script_guard "$s" || return
+  "$s"
 }
 
 oc_examples() {
-  _script_guard "./scripts/select-example.zsh" || return
-  ./scripts/select-example.zsh
+  _workflow_guard || return
+  local s="$OPENCODE_WORKFLOW_SCRIPTS/select-example.zsh"
+  _script_guard "$s" || return
+  "$s"
 }
 
 oc_tasks_generate() {
-  _script_guard "./scripts/generate-tasks.zsh" || return
-  ./scripts/generate-tasks.zsh
+  _workflow_guard || return
+  local s="$OPENCODE_WORKFLOW_SCRIPTS/generate-tasks.zsh"
+  _script_guard "$s" || return
+  "$s"
 }
+
 
 # ------------------------------------------------------------
-# Explicit Review Entrypoints (Plugin-Aligned)
-# ------------------------------------------------------------
-
-oc_review_core() {
-  echo "[opencode] Core architecture review requested"
-  echo "→ Use core-review plugin via OpenCode session"
-  opencode .
-}
-
-oc_review_ts() {
-  echo "[opencode] TypeScript review requested"
-  echo "→ typescript plugin will be resolved by orchestrator"
-  opencode .
-}
-
-oc_review_js() {
-  echo "[opencode] JavaScript review requested"
-  echo "→ javascript plugin will be resolved by orchestrator"
-  opencode .
-}
-
-# ------------------------------------------------------------
-# Discovery Helpers (Read-only)
+# Discovery Helpers (READ-ONLY, NON-AUTHORITATIVE)
 # ------------------------------------------------------------
 
 oc_projects() {
   _oc_guard || return
   command -v fzf >/dev/null 2>&1 || {
-    echo "[opencode] fzf not installed"
+    echo "[opencode] ERROR: fzf not installed"
     return 1
   }
 
@@ -149,4 +160,118 @@ oc_docker() {
     -exec dirname {} \; \
   | fzf --prompt="Docker project > " \
   | xargs -r opencode
+}
+
+oc_new() {
+  echo "[workflow] New project initialization"
+
+  oc_detect || return 1
+
+  if [[ -f ai.project.json ]]; then
+    echo "[workflow] ai.project.json already exists"
+    echo "→ use oc_existing instead"
+    return 1
+  fi
+
+  oc_context_generate || return 1
+
+  echo
+  echo "✔ ai.project.json generated"
+  echo "✋ Fill required fields, then run:"
+  echo "   oc_validate"
+}
+
+oc_existing_validate() {
+  oc_detect || return 1
+  oc_validate || return 1
+
+  echo "✔ Context validated"
+}
+
+oc_existing() {
+  echo "[workflow] Existing project entry"
+
+  oc_existing_validate || return 1
+  echo "→ Opening OpenCode session"
+
+  opencode .
+}
+
+oc_arch() {
+  echo "[workflow] Architecture / Domain workflow"
+
+  oc_existing_validate || return 1
+
+  echo "⚠ Architecture intent detected"
+  echo "→ ADR REQUIRED"
+  echo "→ Gemini 2.5 Pro only"
+
+  opencode .
+}
+
+oc_plan() {
+  echo "[workflow] Planning phase (non-executing)"
+
+  oc_existing_validate || return 1
+
+  echo "⚠ Planning only"
+  echo "→ No code writes"
+  echo "→ No SAVE"
+
+  opencode .
+}
+
+oc_impl() {
+  echo "[workflow] Implementation / Refactor"
+
+  oc_existing_validate || return 1
+
+  echo "⚠ Canary execution REQUIRED"
+  echo "⚠ Diff-scoped only"
+  echo "⚠ Devstral2 only"
+
+  opencode .
+}
+
+oc_review_core() {
+  echo "[workflow] Core review (read-only)"
+  echo "→ core-review plugin"
+
+  oc_existing || return 1
+}
+
+oc_review_ts() {
+  echo "[workflow] TypeScript review"
+  oc_existing || return 1
+}
+
+oc_review_js() {
+  echo "[workflow] JavaScript review"
+  oc_existing || return 1
+}
+
+
+oc_save() {
+  echo "❌ SAVE cannot be triggered from shell"
+  echo "→ Allowed only after verification"
+}
+
+oc_check() {
+  oc_detect && oc_validate
+}
+
+oc_contract_verify() {
+  _workflow_guard || return 1
+  command -v sha256sum >/dev/null 2>&1 || {
+    echo "[opencode] sha256sum not found"
+    return 1
+  }
+
+  local contract_file="$OPENCODE_WORKFLOW_ROOT/CONTRACT.md"
+  [[ -f "$contract_file" ]] || {
+    echo "[opencode] ERROR: Missing CONTRACT.md in workflow root: $OPENCODE_WORKFLOW_ROOT"
+    return 1
+  }
+
+  sha256sum "$contract_file"
 }
