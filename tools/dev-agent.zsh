@@ -10,6 +10,8 @@
 # ------------------------------------------------------------
 
 _agent_guard() {
+  _workflow_guard || return 1
+
   [[ -f "ai.project.json" ]] || {
     echo "[agent] Missing ai.project.json"
     echo "→ run: oc_context_generate"
@@ -23,9 +25,13 @@ _agent_guard() {
 
   # Optional hash-lock enforcement
   if [[ -f "$OPENCODE_WORKFLOW_ROOT/.contract.sha256" ]]; then
+    command -v sha256sum >/dev/null 2>&1 || {
+      echo "[agent] sha256sum not found"
+      return 1
+    }
     local current locked
     current=$(sha256sum "$OPENCODE_WORKFLOW_ROOT/CONTRACT.md" | awk '{print $1}')
-    locked=$(cat "$OPENCODE_WORKFLOW_ROOT/.contract.sha256")
+    locked=$(awk '{print $1}' "$OPENCODE_WORKFLOW_ROOT/.contract.sha256")
 
     [[ "$current" != "$locked" ]] && {
       echo "[agent] CONTRACT.md hash mismatch"
@@ -81,8 +87,8 @@ agent_schema_research() {
     return 1
   }
 
-  export AGENT_INTENT="research"
-  export AGENT_INPUT="$1"
+  local -x AGENT_INTENT="research"
+  local -x AGENT_INPUT="$1"
 
   echo "[agent] Schema research (read-only)"
   echo "→ intent: research"
@@ -98,8 +104,8 @@ agent_schema_research() {
 agent_schema_validate() {
   _agent_guard || return
 
-  export AGENT_INTENT="code_review"
-  export AGENT_SCOPE="schema"
+  local -x AGENT_INTENT="code_review"
+  local -x AGENT_SCOPE="schema"
 
   echo "[agent] Schema validation"
   echo "→ intent: code_review"
@@ -122,7 +128,7 @@ agent_schema_generate() {
     return 1
   }
 
-  export AGENT_INTENT="code_generation"
+  local -x AGENT_INTENT="code_generation"
 
   echo "[agent] Schema generation"
   echo "→ intent: code_generation"
@@ -139,7 +145,7 @@ agent_schema_generate() {
 agent_schema_architecture() {
   _agent_guard || return
 
-  export AGENT_INTENT="architecture"
+  local -x AGENT_INTENT="architecture"
 
   echo "[agent] Architecture intent detected"
   echo "→ ADR required"
@@ -162,7 +168,7 @@ agent_refactor() {
     return 1
   }
 
-  export AGENT_INTENT="refactor"
+  local -x AGENT_INTENT="refactor"
 
   echo "[agent] Refactor request"
   echo "→ intent: refactor"
@@ -179,7 +185,7 @@ agent_refactor() {
 agent_review() {
   _agent_guard || return
 
-  export AGENT_INTENT="code_review"
+  local -x AGENT_INTENT="code_review"
 
   echo "[agent] Review requested"
   echo "→ diff-only"

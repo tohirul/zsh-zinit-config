@@ -19,6 +19,12 @@ _pkg_guard() {
     echo "[node] package.json not found"
     return 1
   }
+  if command -v jq >/dev/null 2>&1; then
+    jq -e . package.json >/dev/null 2>&1 || {
+      echo "[node] package.json is invalid JSON"
+      return 1
+    }
+  fi
 }
 
 _jq_guard() {
@@ -39,11 +45,11 @@ _load_nvm() {
 }
 
 # Safe command wrappers
-node() { unset -f node; _load_nvm || return 127; command node "$@"; }
-npm()  { unset -f npm;  _load_nvm || return 127; command npm  "$@"; }
-pnpm() { unset -f pnpm; _load_nvm || return 127; command pnpm "$@"; }
-bun()  { unset -f bun;  _load_nvm || return 127; command bun  "$@"; }
-nvm()  { unset -f nvm;  _load_nvm || return 127; command nvm  "$@"; }
+node() { unset -f node; _load_nvm; command -v node >/dev/null && command node "$@" || return 127; }
+npm()  { unset -f npm;  _load_nvm; command -v npm  >/dev/null && command npm  "$@" || return 127; }
+pnpm() { unset -f pnpm; _load_nvm; command -v pnpm >/dev/null && command pnpm "$@" || return 127; }
+bun()  { unset -f bun;  _load_nvm; command -v bun  >/dev/null && command bun  "$@" || return 127; }
+nvm()  { unset -f nvm;  _load_nvm || return 127; nvm  "$@"; }
 
 nvm_use() {
   _load_nvm || {
@@ -177,7 +183,13 @@ node_run_all() {
     return 1
   }
 
-  command "$pm" -ws run "$script"
+  case "$pm" in
+    npm)  command npm -ws run "$script" ;;
+    pnpm) command pnpm -r run "$script" ;;
+    yarn) command yarn workspaces foreach run "$script" ;;
+    bun)  command bun --filter '*' run "$script" ;;
+    *)    echo "[node] Unsupported PM for workspaces: $pm"; return 1 ;;
+  esac
 }
 
 # ----------------------------

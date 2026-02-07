@@ -48,10 +48,12 @@ code_workspace() {
   local ws
   ws=$(ls *.code-workspace 2>/dev/null | head -n 1)
 
-  [[ -n "$ws" ]] && code "$ws" || {
+  if [[ -n "$ws" ]]; then
+    code "$ws"
+  else
     echo "[vscode] No .code-workspace file found"
     return 1
-  }
+  fi
 }
 
 # ----------------------------
@@ -115,6 +117,7 @@ code_settings_set() {
 
   code_settings_backup
   tmp=$(mktemp)
+  trap 'rm -f "$tmp"' EXIT
 
   jq ".$key = $value" "$f" > "$tmp" && mv "$tmp" "$f"
   echo "[vscode] Updated setting: $key"

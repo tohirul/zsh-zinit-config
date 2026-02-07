@@ -74,9 +74,12 @@ oc_root() {
 
 oc_here_or_root() {
   _oc_guard || return
-  git rev-parse --show-toplevel 2>/dev/null \
-    | xargs -r opencode \
-    || opencode .
+  local root
+  if root=$(git rev-parse --show-toplevel 2>/dev/null); then
+    opencode "$root"
+  else
+    opencode .
+  fi
 }
 
 # ------------------------------------------------------------
@@ -178,13 +181,17 @@ oc_new() {
   echo "   oc_validate"
 }
 
-oc_existing() {
-  echo "[workflow] Existing project entry"
-
+oc_existing_validate() {
   oc_detect || return 1
   oc_validate || return 1
 
   echo "✔ Context validated"
+}
+
+oc_existing() {
+  echo "[workflow] Existing project entry"
+
+  oc_existing_validate || return 1
   echo "→ Opening OpenCode session"
 
   opencode .
@@ -193,7 +200,7 @@ oc_existing() {
 oc_arch() {
   echo "[workflow] Architecture / Domain workflow"
 
-  oc_existing || return 1
+  oc_existing_validate || return 1
 
   echo "⚠ Architecture intent detected"
   echo "→ ADR REQUIRED"
@@ -205,7 +212,7 @@ oc_arch() {
 oc_plan() {
   echo "[workflow] Planning phase (non-executing)"
 
-  oc_existing || return 1
+  oc_existing_validate || return 1
 
   echo "⚠ Planning only"
   echo "→ No code writes"
@@ -217,7 +224,7 @@ oc_plan() {
 oc_impl() {
   echo "[workflow] Implementation / Refactor"
 
-  oc_existing || return 1
+  oc_existing_validate || return 1
 
   echo "⚠ Canary execution REQUIRED"
   echo "⚠ Diff-scoped only"
@@ -231,19 +238,16 @@ oc_review_core() {
   echo "→ core-review plugin"
 
   oc_existing || return 1
-  opencode .
 }
 
 oc_review_ts() {
   echo "[workflow] TypeScript review"
   oc_existing || return 1
-  opencode .
 }
 
 oc_review_js() {
   echo "[workflow] JavaScript review"
   oc_existing || return 1
-  opencode .
 }
 
 
@@ -257,5 +261,17 @@ oc_check() {
 }
 
 oc_contract_verify() {
-  sha256sum "$OPENCODE_WORKFLOW_ROOT/CONTRACT.md"
+  _workflow_guard || return 1
+  command -v sha256sum >/dev/null 2>&1 || {
+    echo "[opencode] sha256sum not found"
+    return 1
+  }
+
+  local contract_file="$OPENCODE_WORKFLOW_ROOT/CONTRACT.md"
+  [[ -f "$contract_file" ]] || {
+    echo "[opencode] ERROR: Missing CONTRACT.md in workflow root: $OPENCODE_WORKFLOW_ROOT"
+    return 1
+  }
+
+  sha256sum "$contract_file"
 }
