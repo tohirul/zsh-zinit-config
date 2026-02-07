@@ -5,6 +5,7 @@
         ├── utils.zsh
     └── 📁tools
         ├── ai.zsh
+        ├── dev-agent.zsh
         ├── docker.zsh
         ├── git.zsh
         ├── node.zsh
@@ -15,5 +16,6 @@
     ├── aliases.zsh
     ├── functions.zsh
     ├── readme.md
+    ├── structure.md
     └── zsh_backuprc.zsh
 ```
