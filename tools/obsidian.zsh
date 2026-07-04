@@ -5,6 +5,7 @@
 typeset -g _ZSH_TOOL_OBSIDIAN=1
 
 export AZKABAN_VAULT="${AZKABAN_VAULT:-$HOME/azkaban}"
+export AZKABAN_PROJECTS_DIR="${AZKABAN_PROJECTS_DIR:-05_Projects/Active}"
 export OBSIDIAN_VAULT_NAME="${OBSIDIAN_VAULT_NAME:-$(basename "$AZKABAN_VAULT")}"
 
 # ---------- internal helpers ----------
@@ -34,7 +35,7 @@ _obs_slug() {
   input="${input:t}"
   print -r -- "$input" \
     | tr '[:upper:]' '[:lower:]' \
-    | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//'
+    | sed -E 's/[^a-z0-9._-]+/-/g; s/^[._-]+//; s/[._-]+$//'
 }
 
 _obs_title() {
@@ -89,7 +90,24 @@ _obs_project_note_path() {
   local project_path="$1"
   local project_name="${2:-${project_path:t}}"
   local slug="$(_obs_slug "$project_name")"
-  print -r -- "$AZKABAN_VAULT/Projects/$slug.md"
+  print -r -- "$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR/$slug.md"
+}
+
+_obs_connected_project_note() {
+  local project_path="$1"
+  local meta="$project_path/.azkaban/project.md"
+  local rel=""
+
+  if [[ -f "$meta" ]]; then
+    rel="$(awk -F'|' '/\| Note \|/ {gsub(/^[ \t]+|[ \t]+$/, "", $3); print $3; exit}' "$meta")"
+
+    if [[ -n "$rel" && -f "$AZKABAN_VAULT/$rel" ]]; then
+      print -r -- "$AZKABAN_VAULT/$rel"
+      return 0
+    fi
+  fi
+
+  return 1
 }
 
 # ---------- vault actions ----------
@@ -293,21 +311,21 @@ obs-project-connect() {
 
   local slug="$(_obs_slug "$project_name")"
   local title="$(_obs_title "$project_name")"
-  local note="$AZKABAN_VAULT/Projects/$slug.md"
-  local index="$AZKABAN_VAULT/Projects/_index.md"
+  local note="$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR/$slug.md"
+  local index="$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR/_index.md"
   local local_meta_dir="$project_path/.azkaban"
   local local_meta_file="$local_meta_dir/project.md"
-  local remote branch status package_json docker_compose readme
+  local remote branch git_status package_json docker_compose readme
 
   remote="$(_obs_git_remote "$project_path")"
   branch="$(_obs_git_branch "$project_path")"
-  status="$(_obs_git_status_short "$project_path")"
+  git_status="$(_obs_git_status_short "$project_path")"
 
   [[ -f "$project_path/package.json" ]] && package_json="yes" || package_json="no"
   [[ -f "$project_path/docker-compose.yml" || -f "$project_path/compose.yml" ]] && docker_compose="yes" || docker_compose="no"
   [[ -f "$project_path/README.md" ]] && readme="yes" || readme="no"
 
-  mkdir -p "$AZKABAN_VAULT/Projects"
+  mkdir -p "$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR"
   mkdir -p "$local_meta_dir"
 
   if [[ ! -f "$note" ]]; then
@@ -381,7 +399,7 @@ Run:
 obs-project-snapshot "$project_path"
 \`\`\`
 MD
-    _obs_ok "Created project note: Projects/$slug.md"
+    _obs_ok "Created project note: $AZKABAN_PROJECTS_DIR/$slug.md"
   else
     _obs_info "Project note already exists: Projects/$slug.md"
   fi
@@ -415,13 +433,13 @@ This project is connected to the Azkaban Obsidian vault.
 |---|---|
 | Project | $project_name |
 | Vault | $AZKABAN_VAULT |
-| Note | Projects/$slug.md |
+| Note | $AZKABAN_PROJECTS_DIR/$slug.md |
 | Connected | $(_obs_datetime) |
 
 Open the vault note:
 
 \`\`\`zsh
-obs-open "Projects/$slug.md"
+obs-open "$AZKABAN_PROJECTS_DIR/$slug.md"
 \`\`\`
 
 Update project snapshot:
@@ -449,11 +467,14 @@ obs-project-log() {
   fi
 
   project_path="$(realpath "$project_path" 2>/dev/null)"
-  note="$(_obs_project_note_path "$project_path" "$project_name")"
+  note="$(_obs_connected_project_note "$project_path" 2>/dev/null || true)"
+  [[ -z "$note" ]] && note="$(_obs_project_note_path "$project_path" "$project_name")"
 
   if [[ ! -f "$note" ]]; then
     _obs_info "Project note not found. Connecting first..."
     obs-project-connect "$project_path" "$project_name" || return 1
+    note="$(_obs_connected_project_note "$project_path" 2>/dev/null || true)"
+    [[ -z "$note" ]] && note="$(_obs_project_note_path "$project_path" "$project_name")"
   fi
 
   cat >> "$note" <<MD
@@ -480,10 +501,13 @@ obs-project-task() {
   fi
 
   project_path="$(realpath "$project_path" 2>/dev/null)"
-  note="$(_obs_project_note_path "$project_path" "$project_name")"
+  note="$(_obs_connected_project_note "$project_path" 2>/dev/null || true)"
+  [[ -z "$note" ]] && note="$(_obs_project_note_path "$project_path" "$project_name")"
 
   if [[ ! -f "$note" ]]; then
     obs-project-connect "$project_path" "$project_name" || return 1
+    note="$(_obs_connected_project_note "$project_path" 2>/dev/null || true)"
+    [[ -z "$note" ]] && note="$(_obs_project_note_path "$project_path" "$project_name")"
   fi
 
   cat >> "$note" <<MD
@@ -509,7 +533,7 @@ obs-project-snapshot() {
   fi
 
   local slug="$(_obs_slug "$project_name")"
-  local dir="$AZKABAN_VAULT/Projects/$slug"
+  local dir="$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR/$slug"
   local file="$dir/snapshot-$(_obs_date)-$(date +%H%M%S).md"
 
   mkdir -p "$dir"
@@ -603,7 +627,7 @@ PY
 obs-projects() {
   _obs_require_vault || return 1
 
-  local dir="$AZKABAN_VAULT/Projects"
+  local dir="$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR"
 
   if [[ ! -d "$dir" ]]; then
     _obs_err "No Projects directory found in vault."
@@ -614,7 +638,13 @@ obs-projects() {
 }
 
 obs-connect-current() {
-  obs-project-connect "$PWD" "${PWD:t}"
+  local project_name="${PWD:t}"
+
+  if [[ "$PWD" == "$HOME/.zsh" ]]; then
+    project_name="Zsh Configuration"
+  fi
+
+  obs-project-connect "$PWD" "$project_name"
 }
 
 obs-log-current() {
