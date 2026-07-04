@@ -99,7 +99,7 @@ _obs_connected_project_note() {
   local rel=""
 
   if [[ -f "$meta" ]]; then
-    rel="$(awk -F'|' '/\| Note \|/ {gsub(/^[ \t]+|[ \t]+$/, "", $3); print $3; exit}' "$meta")"
+    rel="$(awk -F'|' '/\| Note \|/ {gsub(/^[ \t`]+|[ \t`]+$/, "", $3); print $3; exit}' "$meta")"
 
     if [[ -n "$rel" && -f "$AZKABAN_VAULT/$rel" ]]; then
       print -r -- "$AZKABAN_VAULT/$rel"
@@ -719,3 +719,358 @@ alias azsnap='obs-snapshot-current'
 alias azlog='obs-log-current'
 alias aztodo='obs-task-current'
 alias azprojects='obs-projects'
+
+# -------------------------------------------------------------------
+# Graph-first Obsidian/Azkaban overrides
+# -------------------------------------------------------------------
+# These overrides intentionally DO NOT open notes in Obsidian.
+# They connect repos to existing vault notes and create graph-visible links.
+
+export AZKABAN_AUTO_OPEN="${AZKABAN_AUTO_OPEN:-0}"
+export AZKABAN_PROJECTS_DIR="${AZKABAN_PROJECTS_DIR:-05_Projects/Active}"
+
+_obs_maybe_open_file() {
+  local file="$1"
+
+  if [[ "$AZKABAN_AUTO_OPEN" == "1" ]]; then
+    _obs_open_file "$file"
+  fi
+}
+
+_obs_note_rel_from_abs() {
+  local file="$1"
+  print -r -- "${file#$AZKABAN_VAULT/}"
+}
+
+_obs_wikilink_from_rel() {
+  local rel="$1"
+  local label="$2"
+
+  rel="${rel%.md}"
+
+  if [[ -n "$label" ]]; then
+    print -r -- "[[$rel|$label]]"
+  else
+    print -r -- "[[$rel]]"
+  fi
+}
+
+_obs_append_or_replace_block() {
+  local file="$1"
+  local block_id="$2"
+  local temp
+  temp="$(mktemp)"
+
+  local begin="<!-- AZKABAN:${block_id}:BEGIN -->"
+  local end="<!-- AZKABAN:${block_id}:END -->"
+
+  if grep -q "$begin" "$file" 2>/dev/null; then
+    awk -v begin="$begin" -v end="$end" '
+      $0 == begin { skip=1; next }
+      $0 == end { skip=0; next }
+      skip != 1 { print }
+    ' "$file" > "$temp"
+    mv "$temp" "$file"
+  fi
+
+  {
+    print -r -- ""
+    print -r -- "$begin"
+    cat
+    print -r -- "$end"
+  } >> "$file"
+}
+
+_obs_existing_note() {
+  local rel="$1"
+
+  if [[ -f "$AZKABAN_VAULT/$rel" ]]; then
+    print -r -- "$AZKABAN_VAULT/$rel"
+    return 0
+  fi
+
+  return 1
+}
+
+obs-project-bind() {
+  _obs_require_vault || return 1
+
+  local project_path="${1:-$PWD}"
+  local note_rel="$2"
+  local project_name="$3"
+
+  project_path="$(realpath "$project_path" 2>/dev/null)"
+
+  if [[ -z "$project_path" || ! -d "$project_path" ]]; then
+    _obs_err "Project folder not found."
+    _obs_info "Usage: obs-project-bind /path/to/repo \"05_Projects/Active/Existing Note.md\" \"Project Name\""
+    return 1
+  fi
+
+  if [[ -z "$note_rel" ]]; then
+    _obs_err "Missing vault note path."
+    _obs_info "Usage: obs-project-bind /path/to/repo \"05_Projects/Active/Existing Note.md\" \"Project Name\""
+    return 1
+  fi
+
+  local note="$AZKABAN_VAULT/$note_rel"
+
+  if [[ ! -f "$note" ]]; then
+    _obs_err "Vault note not found: $note_rel"
+    return 1
+  fi
+
+  project_name="${project_name:-${note_rel:t:r}}"
+
+  local meta_dir="$project_path/.azkaban"
+  local meta_file="$meta_dir/project.md"
+  local remote branch repo_name index index_rel note_link index_link cortext_link workflow_link
+
+  mkdir -p "$meta_dir"
+
+  repo_name="${project_path:t}"
+  remote="$(_obs_git_remote "$project_path")"
+  branch="$(_obs_git_branch "$project_path")"
+
+  index="$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR/_index.md"
+  index_rel="$AZKABAN_PROJECTS_DIR/_index.md"
+
+  mkdir -p "$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR"
+
+  if [[ ! -f "$index" ]]; then
+    cat > "$index" <<MD
+---
+type: index
+created: $(_obs_datetime)
+tags:
+  - index
+  - projects
+---
+
+# Active Projects
+
+MD
+  fi
+
+  note_link="$(_obs_wikilink_from_rel "$note_rel" "$project_name")"
+  index_link="$(_obs_wikilink_from_rel "$index_rel" "Active Projects")"
+
+  if [[ -f "$AZKABAN_VAULT/Cortext.md" ]]; then
+    cortext_link="[[Cortext]]"
+  else
+    cortext_link=""
+  fi
+
+  if [[ -f "$AZKABAN_VAULT/04_AI_Workspace/Agent Workflows/Agent OS Workflow.md" ]]; then
+    workflow_link="[[04_AI_Workspace/Agent Workflows/Agent OS Workflow|Agent OS Workflow]]"
+  else
+    workflow_link=""
+  fi
+
+  if ! grep -qF "$note_link" "$index" 2>/dev/null; then
+    print -r -- "- $note_link — \`$project_path\`" >> "$index"
+  fi
+
+  cat > "$meta_file" <<MD
+# Azkaban Link
+
+This local repository is connected to an existing Obsidian project note.
+
+| Field | Value |
+|---|---|
+| Project | $project_name |
+| Local Path | \`$project_path\` |
+| Vault | \`$AZKABAN_VAULT\` |
+| Note | \`$note_rel\` |
+| Connected | $(_obs_datetime) |
+
+Graph node:
+
+$note_link
+MD
+
+  {
+    print -r -- ""
+    print -r -- "## Repository Connection"
+    print -r -- ""
+    print -r -- "| Field | Value |"
+    print -r -- "|---|---|"
+    print -r -- "| Project | $project_name |"
+    print -r -- "| Local Repo | \`$project_path\` |"
+    print -r -- "| Repo Folder | \`$repo_name\` |"
+    print -r -- "| Git Branch | \`${branch:-none}\` |"
+    print -r -- "| Git Remote | \`${remote:-none}\` |"
+    print -r -- "| Connected | $(_obs_datetime) |"
+    print -r -- ""
+    print -r -- "## Graph Connections"
+    print -r -- ""
+    print -r -- "- Project index: $index_link"
+    [[ -n "$cortext_link" ]] && print -r -- "- Vault home: $cortext_link"
+    [[ -n "$workflow_link" ]] && print -r -- "- Agent workflow: $workflow_link"
+    print -r -- ""
+    print -r -- "## Current Local Repo Tasks"
+    print -r -- ""
+    print -r -- "- [ ] Keep this project note updated from terminal captures #task"
+  } | _obs_append_or_replace_block "$note" "REPO-CONNECTION"
+
+  _obs_ok "Bound repo to existing vault note:"
+  print -r -- "  Repo: $project_path"
+  print -r -- "  Note: $note_rel"
+  _obs_ok "Graph-visible links updated inside the note."
+}
+
+obs-project-connect() {
+  _obs_require_vault || return 1
+
+  local project_path="${1:-$PWD}"
+  local project_name="${2:-${project_path:t}}"
+
+  project_path="$(realpath "$project_path" 2>/dev/null)"
+
+  if [[ -z "$project_path" || ! -d "$project_path" ]]; then
+    _obs_err "Project folder not found."
+    return 1
+  fi
+
+  local slug="$(_obs_slug "$project_name")"
+  local note_rel="$AZKABAN_PROJECTS_DIR/$slug.md"
+  local note="$AZKABAN_VAULT/$note_rel"
+
+  mkdir -p "$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR"
+
+  if [[ ! -f "$note" ]]; then
+    cat > "$note" <<MD
+---
+type: project
+project: "$project_name"
+slug: "$slug"
+path: "$project_path"
+created: $(_obs_datetime)
+status: active
+tags:
+  - project
+  - azkaban
+---
+
+# $project_name
+
+## Mission
+
+Describe the purpose of this project.
+
+MD
+  fi
+
+  obs-project-bind "$project_path" "$note_rel" "$project_name"
+}
+
+obs-project-snapshot() {
+  _obs_require_vault || return 1
+
+  local project_path="${1:-$PWD}"
+  local project_name="${2:-${project_path:t}}"
+
+  project_path="$(realpath "$project_path" 2>/dev/null)"
+
+  if [[ -z "$project_path" || ! -d "$project_path" ]]; then
+    _obs_err "Project folder not found."
+    return 1
+  fi
+
+  local meta="$project_path/.azkaban/project.md"
+  local note_rel=""
+
+  if [[ -f "$meta" ]]; then
+    note_rel="$(awk -F'|' '/\| Note \|/ {gsub(/^[ \t`]+|[ \t`]+$/, "", $3); print $3; exit}' "$meta")"
+  fi
+
+  local slug="$(_obs_slug "$project_name")"
+  local dir="$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR/$slug"
+  local file="$dir/snapshot-$(_obs_date)-$(date +%H%M%S).md"
+  local snapshot_rel="${file#$AZKABAN_VAULT/}"
+
+  mkdir -p "$dir"
+
+  {
+    print -r -- "---"
+    print -r -- "type: project-snapshot"
+    print -r -- "project: \"$project_name\""
+    print -r -- "path: \"$project_path\""
+    print -r -- "created: $(_obs_datetime)"
+    print -r -- "tags:"
+    print -r -- "  - project"
+    print -r -- "  - snapshot"
+    print -r -- "---"
+    print -r -- ""
+    print -r -- "# Snapshot — $project_name"
+    print -r -- ""
+    if [[ -n "$note_rel" ]]; then
+      print -r -- "Project note: $(_obs_wikilink_from_rel "$note_rel" "$project_name")"
+      print -r -- ""
+    fi
+    print -r -- "## Path"
+    print -r -- ""
+    print -r -- "\`$project_path\`"
+    print -r -- ""
+    print -r -- "## Git Status"
+    print -r -- ""
+    print -r -- "\`\`\`text"
+    git -C "$project_path" status --short 2>/dev/null || print -r -- "Not a Git repository."
+    print -r -- "\`\`\`"
+    print -r -- ""
+    print -r -- "## Top-Level Structure"
+    print -r -- ""
+    print -r -- "\`\`\`text"
+    find "$project_path" -maxdepth 2 \
+      -not -path '*/.git/*' \
+      -not -path '*/node_modules/*' \
+      -not -path '*/.next/*' \
+      -not -path '*/dist/*' \
+      -not -path '*/build/*' \
+      -print 2>/dev/null \
+      | sed "s|$project_path|.|" \
+      | sort \
+      | head -200
+    print -r -- "\`\`\`"
+  } > "$file"
+
+  if [[ -n "$note_rel" && -f "$AZKABAN_VAULT/$note_rel" ]]; then
+    {
+      print -r -- ""
+      print -r -- "## Latest Snapshot"
+      print -r -- ""
+      print -r -- "- $(_obs_wikilink_from_rel "$snapshot_rel" "Snapshot $(_obs_date) $(date +%H:%M)")"
+    } | _obs_append_or_replace_block "$AZKABAN_VAULT/$note_rel" "LATEST-SNAPSHOT"
+  fi
+
+  _obs_ok "Created graph-linked snapshot:"
+  print -r -- "  $snapshot_rel"
+}
+
+obs-connect-current() {
+  local project_name="${PWD:t}"
+
+  if [[ "$PWD" == "$HOME/.zsh" ]]; then
+    project_name="Zsh Configuration"
+  fi
+
+  obs-project-connect "$PWD" "$project_name"
+}
+
+obs-graph-info() {
+  _obs_require_vault || return 1
+
+  print -r -- "Graph changes are created by markdown links like:"
+  print -r -- ""
+  print -r -- "  [[05_Projects/Active/Project - BanglarBike Next.js Migration|BanglarBike Next.js Migration]]"
+  print -r -- "  [[05_Projects/Active/_index|Active Projects]]"
+  print -r -- "  [[Cortext]]"
+  print -r -- "  [[04_AI_Workspace/Agent Workflows/Agent OS Workflow|Agent OS Workflow]]"
+  print -r -- ""
+  print -r -- "Open Obsidian Graph View manually and watch these nodes connect."
+  print -r -- "This script will not open project notes unless AZKABAN_AUTO_OPEN=1."
+}
+
+alias azbind='obs-project-bind'
+alias azgraph='obs-graph-info'
+
