@@ -4,6 +4,8 @@
 # Shell = guards + delegation ONLY
 # Intelligence lives in model-orchestrator
 # ============================================================
+[[ -n ${_ZSH_TOOL_DEV_AGENT:-} ]] && return
+typeset -g _ZSH_TOOL_DEV_AGENT=1
 
 # ------------------------------------------------------------
 # Guards (AUTHORITATIVE)

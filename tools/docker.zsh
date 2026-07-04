@@ -1,6 +1,8 @@
 # ============================================================
 # Docker Helpers (Ubuntu, Compose v2)
 # ============================================================
+[[ -n ${_ZSH_TOOL_DOCKER:-} ]] && return
+typeset -g _ZSH_TOOL_DOCKER=1
 
 # ---------- guards ----------
 _docker_guard() {

@@ -1,6 +1,8 @@
 # ============================================================
 # Git Helpers (Ubuntu, Safe by Default)
 # ============================================================
+[[ -n ${_ZSH_TOOL_GIT:-} ]] && return
+typeset -g _ZSH_TOOL_GIT=1
 
 # ---------- guards ----------
 _git_guard() {
@@ -57,8 +59,10 @@ gclean-merged() {
   # Dynamically find the default branch (main/master/etc)
   local base=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
   git fetch -p
+  # Match whole branch names only (leading "  " or "* " then exact name)
   git branch --merged "$base" \
-    | grep -Ev "(^\*|$base|dev|staging)" \
+    | sed 's/^[* ] *//' \
+    | grep -Ev "^(${base}|dev|develop|staging|main|master)$" \
     | xargs -r git branch -d
 }
 # ---------- stash ----------

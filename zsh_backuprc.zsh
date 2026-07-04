@@ -1,5 +1,6 @@
 # ============================================================
 # Zsh Developer Framework — Ubuntu (Hardened, Authoritative)
+# Thin orchestrator: sources modules from $ZSH_HOME, no logic here.
 # ============================================================
 
 # ------------------------------------------------------------
@@ -10,23 +11,17 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
 fi
 
 # ------------------------------------------------------------
-# Base Environment
+# Base environment
 # ------------------------------------------------------------
 export ZSH_HOME="$HOME/.zsh"
 export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$PATH"
 
-# ------------------------------------------------------------
-# OpenCode Workflow Root (AUTHORITATIVE)
-# ------------------------------------------------------------
-# NOTE:
-# - Scripts are NOT added to PATH
-# - Access ONLY via oc_* adapters
-# ------------------------------------------------------------
+# OpenCode workflow root (accessed only via oc_* adapters; not on PATH)
 export OPENCODE_WORKFLOW_ROOT="$HOME/.agent/skills/vscode-opencode-workflow"
 export OPENCODE_WORKFLOW_SCRIPTS="$OPENCODE_WORKFLOW_ROOT/scripts"
 
 # ------------------------------------------------------------
-# History (Hardened, Shared)
+# History (hardened, shared)
 # ------------------------------------------------------------
 HISTFILE="$HOME/.zsh_history"
 HISTSIZE=10000
@@ -40,7 +35,7 @@ setopt HIST_REDUCE_BLANKS
 setopt HIST_VERIFY
 
 # ------------------------------------------------------------
-# Zinit (Plugin Manager)
+# Zinit (plugin manager)
 # ------------------------------------------------------------
 if [[ ! -f "$HOME/.local/share/zinit/zinit.git/zinit.zsh" ]]; then
   mkdir -p "$HOME/.local/share/zinit"
@@ -49,17 +44,13 @@ if [[ ! -f "$HOME/.local/share/zinit/zinit.git/zinit.zsh" ]]; then
 fi
 source "$HOME/.local/share/zinit/zinit.git/zinit.zsh"
 
-# ------------------------------------------------------------
-# Zinit Annexes (Required)
-# ------------------------------------------------------------
+# Annexes
 zinit light-mode for \
   zdharma-continuum/zinit-annex-as-monitor \
   zdharma-continuum/zinit-annex-bin-gem-node \
   zdharma-continuum/zinit-annex-patch-dl
 
-# ------------------------------------------------------------
-# Core Plugins (Async, Non-blocking)
-# ------------------------------------------------------------
+# Core plugins (async, non-blocking)
 zinit wait lucid for \
   zsh-users/zsh-autosuggestions \
   zsh-users/zsh-completions \
@@ -69,9 +60,7 @@ zinit wait lucid for \
   ajeetdsouza/zoxide \
   changyuheng/zsh-interactive-cd
 
-# ------------------------------------------------------------
-# Utility Plugins (Oh-My-Zsh via Zinit)
-# ------------------------------------------------------------
+# Utility plugins (Oh-My-Zsh via Zinit)
 zinit wait"0a" lucid for \
   pick"plugins/sudo/sudo.plugin.zsh" ohmyzsh/ohmyzsh \
   pick"plugins/extract/extract.plugin.zsh" ohmyzsh/ohmyzsh \
@@ -94,32 +83,27 @@ zinit light romkatv/powerlevel10k
 [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
 
 # ------------------------------------------------------------
-# External Tooling Integrations
+# External tooling integrations
 # ------------------------------------------------------------
 [[ -f ~/.fzf.zsh ]] && source ~/.fzf.zsh
-eval "$(zoxide init zsh)"
 
 if command -v direnv >/dev/null 2>&1; then
   eval "$(direnv hook zsh)"
 fi
 
 # ------------------------------------------------------------
-# Prevent Alias / Function Collisions (CRITICAL)
+# Prevent alias/function collisions (before user layer loads)
 # ------------------------------------------------------------
+unalias -m '*' 2>/dev/null
 
 # ------------------------------------------------------------
-# Framework Libraries
+# Framework libraries
 # ------------------------------------------------------------
 source "$ZSH_HOME/lib/errors.zsh"
 source "$ZSH_HOME/lib/utils.zsh"
 
 # ------------------------------------------------------------
-# Tooling Layers (THIN ADAPTERS ONLY)
-# ------------------------------------------------------------
-# NOTE:
-# - NO orchestration logic here
-# - NO model selection
-# - NO context mutation
+# Tooling layers (thin adapters only)
 # ------------------------------------------------------------
 source "$ZSH_HOME/tools/git.zsh"
 source "$ZSH_HOME/tools/docker.zsh"
@@ -127,18 +111,21 @@ source "$ZSH_HOME/tools/node.zsh"
 source "$ZSH_HOME/tools/python.zsh"
 source "$ZSH_HOME/tools/system.zsh"
 source "$ZSH_HOME/tools/vscode.zsh"
+source "$ZSH_HOME/tools/gpu.zsh"
 source "$ZSH_HOME/tools/ai.zsh"
 source "$ZSH_HOME/tools/opencode.zsh"
 source "$ZSH_HOME/tools/dev-agent.zsh"
+source "$ZSH_HOME/tools/audit.zsh"
+source "$ZSH_HOME/tools/obsidian.zsh"
 
 # ------------------------------------------------------------
-# User Layer (Aliases & Custom Functions)
+# User layer (aliases & custom functions)
 # ------------------------------------------------------------
 source "$ZSH_HOME/aliases.zsh"
 source "$ZSH_HOME/functions.zsh"
 
 # ------------------------------------------------------------
-# Completion System (Cached, Hardened)
+# Completion system (cached, hardened)
 # ------------------------------------------------------------
 autoload -Uz compinit
 if [[ -n "${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump"(#qN.m-1) ]]; then
@@ -148,5 +135,39 @@ else
 fi
 
 # ============================================================
+# Machine-local integrations (installer-managed; keep last)
+# ============================================================
+
+# nvm (node.zsh also lazy-loads nvm on demand; this keeps `node` on PATH eagerly)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+__conda_setup="$('/home/tohirul-islam/anaconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__conda_setup"
+else
+    if [ -f "/home/tohirul-islam/anaconda3/etc/profile.d/conda.sh" ]; then
+        . "/home/tohirul-islam/anaconda3/etc/profile.d/conda.sh"
+    else
+        export PATH="/home/tohirul-islam/anaconda3/bin:$PATH"
+    fi
+fi
+unset __conda_setup
+# <<< conda initialize <<<
+
+# ------------------------------------------------------------
+# zoxide — initialized LAST so its precmd hook stays last
+# (this is what `zoxide doctor` expects; avoids the config warning)
+# ------------------------------------------------------------
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init zsh)"
+  alias cd='z'
+fi
+
+# ============================================================
 # End of Authoritative .zshrc
 # ============================================================
+setopt interactivecomments

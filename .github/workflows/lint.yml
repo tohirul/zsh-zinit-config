@@ -1,0 +1,64 @@
+name: lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  zsh-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install zsh + hyperfine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh hyperfine
+
+      - name: Syntax check every module (zsh -n)
+        run: |
+          set -e
+          fail=0
+          for f in lib/*.zsh tools/*.zsh aliases.zsh functions.zsh zsh_backuprc.zsh; do
+            if zsh -n "$f"; then
+              echo "OK    $f"
+            else
+              echo "FAIL  $f"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Guard against re-duplicated bootstrap
+        run: |
+          copies=$(grep -c 'source "\$ZSH_HOME/lib/errors.zsh"' zsh_backuprc.zsh || true)
+          echo "bootstrap copies in snapshot: $copies"
+          if [ "$copies" -gt 1 ]; then
+            echo "ERROR: zsh_backuprc.zsh contains duplicated framework bootstrap"
+            exit 1
+          fi
+
+      - name: Every module has a source-once guard
+        run: |
+          fail=0
+          for f in tools/*.zsh lib/*.zsh aliases.zsh functions.zsh; do
+            if ! grep -q 'typeset -g _ZSH' "$f"; then
+              echo "MISSING guard: $f"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Smoke-source modules in a clean shell
+        run: |
+          export ZSH_HOME="$PWD"
+          zsh -c '
+            source lib/errors.zsh
+            source lib/utils.zsh
+            for t in tools/*.zsh; do source "$t"; done
+            source aliases.zsh
+            source functions.zsh
+            # sourcing twice must be a no-op (idempotency)
+            source tools/git.zsh
+            echo "smoke-source OK"
+          '

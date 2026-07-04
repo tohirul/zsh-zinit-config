@@ -1,6 +1,8 @@
 # ============================================================
 # System Helpers (Ubuntu, Safe, Manual)
 # ============================================================
+[[ -n ${_ZSH_TOOL_SYSTEM:-} ]] && return
+typeset -g _ZSH_TOOL_SYSTEM=1
 
 # ---------- guards ----------
 _is_linux() {

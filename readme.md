@@ -40,6 +40,8 @@ This repository represents a **frozen, stable baseline**.
 - Python (Conda-only, manual activation)
 - System diagnostics (Ubuntu)
 - VS Code CLI helpers
+- NVIDIA PRIME GPU launchers (`prun`, `codegpu`, `chromevk`, …)
+- Framework self-audit (`zsh_audit` / `dev_doctor`)
 
 ---
 
@@ -212,9 +214,14 @@ node_info
 py_health
 fzf_cd
 dev_health
+zsh_audit   # full framework self-diagnostic (syntax, duplication, collisions, startup time)
 ```
 
 All commands should work immediately.
+
+> `~/.zshrc` is a thin orchestrator that sources the modules in `~/.zsh`.
+> Every module carries a source-once guard, so it can never be duplicated by
+> repeated appends. Run `zsh_audit` any time to confirm the framework is healthy.
 
 ---
 

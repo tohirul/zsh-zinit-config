@@ -2,24 +2,12 @@
 # VS Code Helpers (Drop-in, Hardened, jq-based)
 # Ubuntu / Safe / Deterministic
 # ============================================================
+[[ -n ${_ZSH_TOOL_VSCODE:-} ]] && return
+typeset -g _ZSH_TOOL_VSCODE=1
 
 # ----------------------------
-# Guards
+# Guards (_code_guard / _jq_guard provided by lib/utils.zsh)
 # ----------------------------
-
-_code_guard() {
-  command -v code >/dev/null 2>&1 || {
-    echo "[vscode] 'code' command not found (install VS Code + enable shell command)"
-    return 1
-  }
-}
-
-_jq_guard() {
-  command -v jq >/dev/null 2>&1 || {
-    echo "[vscode] jq is required but not installed"
-    return 1
-  }
-}
 
 # ----------------------------
 # Paths

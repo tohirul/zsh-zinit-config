@@ -1,6 +1,8 @@
 # ============================================================
 # AI Agent Integration (OpenCode + OmO)
 # ============================================================
+[[ -n ${_ZSH_TOOL_AI:-} ]] && return
+typeset -g _ZSH_TOOL_AI=1
 
 # ---------- OpenCode Guards ----------
 _opencode_guard() {

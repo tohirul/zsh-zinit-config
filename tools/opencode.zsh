@@ -18,18 +18,14 @@
 
 # ------------------------------------------------------------
 # Guards (NO FALLBACKS, NO INFERENCE)
+# _code_guard provided by lib/utils.zsh
 # ------------------------------------------------------------
+[[ -n ${_ZSH_TOOL_OPENCODE:-} ]] && return
+typeset -g _ZSH_TOOL_OPENCODE=1
 
 _oc_guard() {
   command -v opencode >/dev/null 2>&1 || {
     echo "[opencode] ERROR: opencode not found"
-    return 1
-  }
-}
-
-_code_guard() {
-  command -v code >/dev/null 2>&1 || {
-    echo "[opencode] ERROR: VS Code not found"
     return 1
   }
 }
