@@ -4,9 +4,17 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: zsh-lint-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   zsh-lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -61,16 +69,50 @@ jobs:
         run: |
           export ZSH_HOME="$PWD"
           zsh -c '
-            source lib/errors.zsh
-            source lib/utils.zsh
-            for t in tools/*.zsh tools/*/*.zsh; do source "$t"; done
-            source aliases.zsh
-            source functions.zsh
+            source lib/errors.zsh || exit 1
+            source lib/utils.zsh || exit 1
+            for t in tools/*.zsh tools/*/*.zsh; do
+              source "$t" || { echo "FAILED to source: $t" >&2; exit 1; }
+            done
+            source aliases.zsh || exit 1
+            source functions.zsh || exit 1
             # sourcing twice must be a no-op (idempotency)
-            source tools/git.zsh
+            source tools/git.zsh || exit 1
             echo "smoke-source OK"
           '
+
+      - name: No dangerous startup patterns in zsh_backuprc.zsh
+        run: |
+          if grep -RInE 'unalias[[:space:]]+-m|source.*nvm\.sh|conda shell\.zsh hook|curl.*\|.*(sh|bash|zsh)|wget.*\|.*(sh|bash|zsh)' zsh_backuprc.zsh; then
+            echo "ERROR: startup orchestrator contains a dangerous pattern (see above)"
+            exit 1
+          fi
+          echo "OK: no dangerous startup patterns"
+
+      - name: No machine-specific absolute paths
+        run: |
+          if grep -RInE '/home/[A-Za-z0-9._-]+/|/Users/[A-Za-z0-9._-]+/' . \
+              --exclude-dir=.git --exclude-dir=.audit; then
+            echo "ERROR: machine-specific absolute path found (see above)"
+            exit 1
+          fi
+          echo "OK: no machine-specific absolute paths"
 
       - name: Regression tests (hermetic)
         run: |
           zsh tests/run.zsh
+
+      - name: Framework audit
+        run: |
+          export ZSH_HOME="$PWD"
+          # zsh_audit checks the DEPLOYED ~/.zshrc (not the repo file
+          # directly) for several startup-safety checks; mirror it here
+          # so the audit has something meaningful to check in a fresh
+          # checkout, same as scripts/bootstrap.zsh would on a real machine.
+          cp zsh_backuprc.zsh "$HOME/.zshrc"
+          zsh -f -c '
+            source lib/errors.zsh
+            source lib/utils.zsh
+            source tools/audit.zsh
+            zsh_audit
+          '

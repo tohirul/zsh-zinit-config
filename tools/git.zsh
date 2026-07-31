@@ -72,11 +72,12 @@ gclean-merged() {
   local prune=0
   [[ "$1" == "-f" || "$1" == "--prune" ]] && prune=1
 
-  git fetch -p 2>/dev/null || true
+  if ! git fetch -p 2>/dev/null; then
+    echo "[git] warning: 'git fetch -p' failed; merged-branch list may be based on stale remote-tracking data." >&2
+  fi
 
   local merged
-  merged=$(git branch --merged "$base" 2>/dev/null \
-    | sed 's/^[* ] *//' \
+  merged=$(git for-each-ref --format='%(refname:short)' --merged "$base" refs/heads/ 2>/dev/null \
     | grep -Ev "^(HEAD|${base}|dev|develop|staging|main|master)$" \
     | grep -v '^$' || true)
 

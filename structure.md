@@ -3,7 +3,9 @@
     ├── aliases.zsh              # simple, non-conflicting aliases (incl. az*/gf*)
     ├── functions.zsh            # user workflows
     ├── zsh_backuprc.zsh         # clean snapshot of ~/.zshrc (thin orchestrator)
-    ├── local.zsh.example        # machine-local override template (local.zsh is git-ignored)
+    ├── local.env.zsh.example    # early (variable-only) override template (local.env.zsh is git-ignored)
+    ├── local.zsh.example        # late (alias/function) override template (local.zsh is git-ignored)
+    ├── plugins.lock             # pinned Zinit plugin revisions (used by scripts/install-plugins.zsh)
     ├── readme.md
     ├── structure.md
     ├── CHANGELOG.md
@@ -41,16 +43,27 @@
     │       ├── installers.zsh   # gfinstall, gfinitignore, gfhook, gfagents
     │       └── help.zsh         # gfstatus, gfhelp, gf* short aliases
     ├── 📁scripts
-    │   ├── bootstrap.zsh        # idempotent one-time setup (zinit, local.zsh, rc, zcompile)
+    │   ├── bootstrap.zsh        # idempotent one-time setup (zinit, local.env.zsh/local.zsh, rc, zcompile)
     │   ├── install-zinit.zsh    # installs Zinit under $ZINIT_HOME
+    │   ├── install-plugins.zsh  # installs pinned plugins from plugins.lock (never run at startup)
     │   └── install-graphify.sh  # POSIX installer for the graphify CLI (used by gfinstall)
     ├── 📁tests
     │   ├── run.zsh              # hermetic test runner (zsh tests/run.zsh)
     │   ├── test_helper.zsh      # assertion helpers (_t_*)
+    │   ├── 📁fixtures
+    │   │   ├── fake-bin/        # curl/wget/git stubs for the startup network test
+    │   │   └── fake-nvm/        # fake nvm.sh for the node lazy-loading tests
     │   └── 📁cases
-    │       ├── commands.zsh     # public command/alias parity
-    │       ├── obsidian.zsh     # obsidian split regression
-    │       └── graphify.zsh     # graphify split regression
+    │       ├── commands.zsh          # public command/alias parity
+    │       ├── obsidian.zsh          # obsidian split regression
+    │       ├── obsidian_hardening.zsh # malformed blocks, obs-sync failures, auto-open, snapshots
+    │       ├── graphify.zsh          # graphify split regression
+    │       ├── graphify_hardening.zsh # build/staging transactions, security policy, query cwd
+    │       ├── node.zsh              # node lazy-loading
+    │       ├── python.zsh            # conda readiness, base-env guard, .conda-env validation
+    │       ├── support_tools.zsh     # dev_clean guard, gclean-merged, GPU/vscode/opencode fixes
+    │       ├── audit.zsh             # zsh_audit self-tests (clean + injected-bad fixtures)
+    │       └── startup.zsh           # isolated startup: no network, no plugin auto-clone
     ├── 📁docs
     │   ├── TESTING.md           # how the regression suite works
     │   ├── OBSIDIAN.md          # Obsidian/Azkaban workflow

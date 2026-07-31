@@ -152,24 +152,50 @@ oc_projects() {
 }
 
 oc_node() {
-  find . -maxdepth 3 -name package.json -exec dirname {} \; \
-    | fzf --prompt="Node project > " \
-    | xargs -r opencode
+  _oc_guard || return
+  command -v fzf >/dev/null 2>&1 || {
+    echo "[opencode] ERROR: fzf not installed"
+    return 1
+  }
+
+  local dir
+  dir=$(find . -maxdepth 3 -name package.json -exec dirname {} \; 2>/dev/null \
+    | fzf --prompt="Node project > ")
+
+  [[ -n "$dir" ]] && opencode "$dir"
 }
 
 oc_python() {
-  find . -maxdepth 3 \
-    \( -name pyproject.toml -o -name environment.yml \) \
-    -exec dirname {} \; \
-  | fzf --prompt="Python project > " \
-  | xargs -r opencode
+  _oc_guard || return
+  command -v fzf >/dev/null 2>&1 || {
+    echo "[opencode] ERROR: fzf not installed"
+    return 1
+  }
+
+  local dir
+  dir=$(find . -maxdepth 3 \
+      \( -name pyproject.toml -o -name environment.yml \) \
+      -exec dirname {} \; 2>/dev/null \
+    | fzf --prompt="Python project > ")
+
+  [[ -n "$dir" ]] && opencode "$dir"
 }
 
 oc_docker() {
-  find . -maxdepth 3 -name docker-compose.yml \
-    -exec dirname {} \; \
-  | fzf --prompt="Docker project > " \
-  | xargs -r opencode
+  _oc_guard || return
+  command -v fzf >/dev/null 2>&1 || {
+    echo "[opencode] ERROR: fzf not installed"
+    return 1
+  }
+
+  local dir
+  dir=$(find . -maxdepth 3 \
+      \( -name compose.yaml -o -name compose.yml -o -name docker-compose.yml -o -name docker-compose.yaml \) \
+      -exec dirname {} \; 2>/dev/null \
+    | sort -u \
+    | fzf --prompt="Docker project > ")
+
+  [[ -n "$dir" ]] && opencode "$dir"
 }
 
 oc_new() {

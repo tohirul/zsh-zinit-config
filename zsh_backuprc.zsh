@@ -6,8 +6,13 @@
 #   - No network access. No cloning. No installer execution.
 #   - No eager NVM or Conda initialization. No environment activation.
 #   - No global alias destruction (no `unalias -m '*'`).
-#   - Machine-local configuration lives in $ZSH_HOME/local.zsh (git-ignored).
+#   - Early (variable-only) machine-local config: $ZSH_HOME/local.env.zsh.
+#   - Late (aliases/functions) machine-local config: $ZSH_HOME/local.zsh.
 #   - Zinit must be installed explicitly via scripts/install-zinit.zsh.
+#   - Zinit plugins must be installed explicitly via
+#     scripts/install-plugins.zsh (see plugins.lock); a plugin whose
+#     directory isn't present yet is skipped with a warning, never
+#     cloned from here.
 # ============================================================
 
 # ------------------------------------------------------------
@@ -22,6 +27,11 @@ fi
 # ------------------------------------------------------------
 export ZSH_HOME="${ZSH_HOME:-$HOME/.zsh}"
 export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$PATH"
+
+# Early machine-local config (variables only). Sourced now, before Zinit
+# and tools/* resolve their defaults, so overrides here actually take
+# effect. See local.env.zsh.example.
+[[ -r "$ZSH_HOME/local.env.zsh" ]] && source "$ZSH_HOME/local.env.zsh"
 
 # ------------------------------------------------------------
 # History (hardened: private, shared, bounded)
@@ -58,40 +68,74 @@ typeset _ZSH_ZINIT_PLUGINS_DIR="${ZINIT_HOME:h}/plugins"
 if [[ -r "$_ZSH_ZINIT_BIN" ]]; then
   source "$_ZSH_ZINIT_BIN"
 
+  # Deterministic plugin lifecycle: a plugin is only ever *loaded* here if
+  # its clone directory already exists (installed explicitly via
+  # scripts/install-plugins.zsh). A missing plugin is skipped with one
+  # warning instead of being cloned on the spot.
+  _zsh_plugins_ready() {
+    local spec
+    for spec in "$@"; do
+      [[ -d "$_ZSH_ZINIT_PLUGINS_DIR/${spec//\//---}" ]] || return 1
+    done
+    return 0
+  }
+
   # Annexes (extend zinit; required by the plugin recipes below)
-  zinit light-mode for \
-    zdharma-continuum/zinit-annex-as-monitor \
-    zdharma-continuum/zinit-annex-bin-gem-node \
-    zdharma-continuum/zinit-annex-patch-dl
+  if _zsh_plugins_ready zdharma-continuum/zinit-annex-as-monitor zdharma-continuum/zinit-annex-bin-gem-node zdharma-continuum/zinit-annex-patch-dl; then
+    zinit light-mode for \
+      zdharma-continuum/zinit-annex-as-monitor \
+      zdharma-continuum/zinit-annex-bin-gem-node \
+      zdharma-continuum/zinit-annex-patch-dl
+  else
+    print -u2 -P -- "%F{yellow}[zinit] annexes not installed — run scripts/install-plugins.zsh%f"
+  fi
 
   # Core plugins (async, non-blocking)
-  zinit wait lucid for \
-    zsh-users/zsh-autosuggestions \
-    zsh-users/zsh-completions \
-    zdharma-continuum/fast-syntax-highlighting \
-    junegunn/fzf \
-    atload'alias cd="z"' \
-    ajeetdsouza/zoxide \
-    changyuheng/zsh-interactive-cd
+  if _zsh_plugins_ready zsh-users/zsh-autosuggestions zsh-users/zsh-completions zdharma-continuum/fast-syntax-highlighting junegunn/fzf ajeetdsouza/zoxide changyuheng/zsh-interactive-cd; then
+    zinit wait lucid for \
+      zsh-users/zsh-autosuggestions \
+      zsh-users/zsh-completions \
+      zdharma-continuum/fast-syntax-highlighting \
+      junegunn/fzf \
+      atload'alias cd="z"' \
+      ajeetdsouza/zoxide \
+      changyuheng/zsh-interactive-cd
+  else
+    print -u2 -P -- "%F{yellow}[zinit] core plugin bundle not installed — run scripts/install-plugins.zsh%f"
+  fi
 
   # history-substring-search: bind widgets only after the plugin has loaded.
-  zinit wait lucid for \
-    atload'bindkey "^[[A" history-substring-search-up; bindkey "^[[B" history-substring-search-down' \
-    zsh-users/zsh-history-substring-search
+  if _zsh_plugins_ready zsh-users/zsh-history-substring-search; then
+    zinit wait lucid for \
+      atload'bindkey "^[[A" history-substring-search-up; bindkey "^[[B" history-substring-search-down' \
+      zsh-users/zsh-history-substring-search
+  else
+    print -u2 -P -- "%F{yellow}[zinit] zsh-history-substring-search not installed — run scripts/install-plugins.zsh%f"
+  fi
 
   # Utility plugins (Oh-My-Zsh via Zinit)
-  zinit wait"0a" lucid for \
-    pick"plugins/sudo/sudo.plugin.zsh" ohmyzsh/ohmyzsh \
-    pick"plugins/extract/extract.plugin.zsh" ohmyzsh/ohmyzsh \
-    pick"plugins/colored-man-pages/colored-man-pages.plugin.zsh" ohmyzsh/ohmyzsh \
-    pick"plugins/command-not-found/command-not-found.plugin.zsh" ohmyzsh/ohmyzsh \
-    pick"plugins/copyfile/copyfile.plugin.zsh" ohmyzsh/ohmyzsh \
-    pick"plugins/copypath/copypath.plugin.zsh" ohmyzsh/ohmyzsh \
-    pick"plugins/web-search/web-search.plugin.zsh" ohmyzsh/ohmyzsh
+  if _zsh_plugins_ready ohmyzsh/ohmyzsh; then
+    zinit wait"0a" lucid for \
+      pick"plugins/sudo/sudo.plugin.zsh" ohmyzsh/ohmyzsh \
+      pick"plugins/extract/extract.plugin.zsh" ohmyzsh/ohmyzsh \
+      pick"plugins/colored-man-pages/colored-man-pages.plugin.zsh" ohmyzsh/ohmyzsh \
+      pick"plugins/command-not-found/command-not-found.plugin.zsh" ohmyzsh/ohmyzsh \
+      pick"plugins/copyfile/copyfile.plugin.zsh" ohmyzsh/ohmyzsh \
+      pick"plugins/copypath/copypath.plugin.zsh" ohmyzsh/ohmyzsh \
+      pick"plugins/web-search/web-search.plugin.zsh" ohmyzsh/ohmyzsh
+  else
+    print -u2 -P -- "%F{yellow}[zinit] ohmyzsh utility plugins not installed — run scripts/install-plugins.zsh%f"
+  fi
 
   # Prompt — must load synchronously to stay Powerlevel10k instant-prompt compatible.
-  zinit light romkatv/powerlevel10k
-  [[ -r "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"
+  if _zsh_plugins_ready romkatv/powerlevel10k; then
+    zinit light romkatv/powerlevel10k
+    [[ -r "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"
+  else
+    print -u2 -P -- "%F{yellow}[zinit] powerlevel10k not installed — run scripts/install-plugins.zsh%f"
+  fi
+
+  unfunction _zsh_plugins_ready
 else
   print -u2 -P -- "%F{yellow}[zinit] Plugin manager not found: %f$_ZSH_ZINIT_BIN"
   print -u2 -P -- "%F{yellow}[zinit] Install it once with: %f\$ZSH_HOME/scripts/install-zinit.zsh"
@@ -173,7 +217,8 @@ fi
 unset _zsh_cache_dir
 
 # ------------------------------------------------------------
-# Machine-local configuration (git-ignored; overrides allowed)
+# Machine-local aliases/functions (git-ignored; late override hook)
+# Variable overrides belong in local.env.zsh (sourced early, above).
 # See local.zsh.example for the available knobs.
 # ------------------------------------------------------------
 [[ -r "$ZSH_HOME/local.zsh" ]] && source "$ZSH_HOME/local.zsh"

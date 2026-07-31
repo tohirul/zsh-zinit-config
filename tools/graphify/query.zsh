@@ -67,8 +67,9 @@ gfq() {
     echo 'Usage: gfq "question about this project"'
     return 1
   }
-  _gf_require_graph "$(_gf_root)" || return 1
-  graphify query "$q"
+  local root="$(_gf_root)"
+  _gf_require_graph "$root" || return 1
+  (cd "$root" && graphify query "$q")
 }
 
 gfpath() {
@@ -77,8 +78,9 @@ gfpath() {
     echo 'Usage: gfpath "node A" "node B"'
     return 1
   }
-  _gf_require_graph "$(_gf_root)" || return 1
-  graphify path "$1" "$2"
+  local root="$(_gf_root)"
+  _gf_require_graph "$root" || return 1
+  (cd "$root" && graphify path "$1" "$2")
 }
 
 gfexplain() {
@@ -88,11 +90,15 @@ gfexplain() {
     echo 'Usage: gfexplain "topic"'
     return 1
   }
-  _gf_require_graph "$(_gf_root)" || return 1
-  graphify explain "$topic"
+  local root="$(_gf_root)"
+  _gf_require_graph "$root" || return 1
+  (cd "$root" && graphify explain "$topic")
 }
 
-# Create a compact AI context file from Graphify results.
+# Create a compact AI context file from Graphify results. Only installs
+# AI_CONTEXT.md (and only copies to the clipboard) when the underlying
+# `graphify query` actually succeeds — a failed/garbage query must not
+# silently overwrite a previous good AI_CONTEXT.md or report success.
 gfai() {
   _gf_need graphify || return 1
   local q="$*"
@@ -105,6 +111,11 @@ gfai() {
   _gf_require_graph "$root" || return 1
 
   local out="$root/graphify-out/AI_CONTEXT.md"
+  local tmp answer query_rc
+  tmp="$(mktemp "$root/graphify-out/.AI_CONTEXT.md.XXXXXXXX")" || return 1
+
+  answer="$(cd "$root" && graphify query "$q" 2>&1)"
+  query_rc=$?
 
   {
     echo "# Graphify AI Context"
@@ -116,13 +127,21 @@ gfai() {
     echo
     echo "## Graphify Answer"
     echo
-    graphify query "$q" 2>&1 || true
+    print -r -- "$answer"
     echo
     echo "## Report Preview"
     echo
     sed -n '1,180p' "$root/graphify-out/GRAPH_REPORT.md" 2>/dev/null || true
-  } > "$out"
+  } > "$tmp"
 
+  if (( query_rc != 0 )); then
+    rm -f -- "$tmp"
+    echo "gfai: graphify query failed; AI_CONTEXT.md was not updated." >&2
+    print -r -- "$answer" >&2
+    return 1
+  fi
+
+  mv -- "$tmp" "$out" || { rm -f -- "$tmp"; return 1; }
   echo "Created: $out"
 
   if command -v wl-copy >/dev/null 2>&1; then

@@ -1,51 +1,22 @@
 # ============================================================
-# local.zsh — Machine-local overrides (git-ignored)
+# local.zsh — Machine-local aliases & function overrides (git-ignored)
 #
-# Copy this file to $ZSH_HOME/local.zsh and edit. It is sourced
-# LAST by the orchestrator, so anything defined here overrides
-# framework defaults. Keep machine-specific settings here so the
-# committed framework stays portable.
+# Copy this file to $ZSH_HOME/local.zsh and edit. It is sourced LAST
+# by the orchestrator, after every tools/*, aliases.zsh, and
+# functions.zsh module — so it's the right place for aliases,
+# function overrides, and anything that needs the framework's own
+# functions already defined.
+#
+# For plain variable overrides (AZKABAN_VAULT, ZINIT_HOME, etc.) that
+# need to take effect BEFORE Zinit/tools load, use local.env.zsh
+# instead — see local.env.zsh.example. Setting a variable here is too
+# late to affect anything the framework already derived from it.
 # ============================================================
 
-# ---- Optional: relocate the framework root (default: ~/.zsh) ----
-# export ZSH_HOME="$HOME/.zsh"
-
-# ---- Optional: relocate the Zinit installation (default: ~/.local/share/zinit/zinit.git) ----
-# export ZINIT_HOME="$HOME/.local/share/zinit/zinit.git"
-
-# ---- Optional: OpenCode workflow root ----
-# Used by tools/opencode.zsh (oc_* adapters). Defaults to the
-# conventional location below; point it at your real checkout.
-# export OPENCODE_WORKFLOW_ROOT="$HOME/.agents/skills/vscode-opencode-workflow"
-# export OPENCODE_WORKFLOW_SCRIPTS="$OPENCODE_WORKFLOW_ROOT/scripts"
-
-# ---- Optional: Agent skills home (tools/dev-agent.zsh, tools/opencode.zsh) ----
-# export AGENT_SKILLS_HOME="$HOME/.agents/skills"
-
-# ---- Optional: Obsidian / Azkaban numbered layout (tools/obsidian/) ----
-# Defaults match a vault at ~/azkaban with numbered folders. Override here
-# if your vault uses a different layout.
-# export AZKABAN_VAULT="$HOME/azkaban"
-# export AZKABAN_INBOX_DIR="00_Inbox"
-# export AZKABAN_INBOX_FILE="Inbox.md"
-# export AZKABAN_DAILY_DIR="01_Daily/Daily Notes"
-# export AZKABAN_TASKS_DIR="02_Tasks"
-# export AZKABAN_TASKS_FILE="inbox.md"
-# export AZKABAN_NOTES_DIR="10_Knowledge_Base/Atomic Notes"
-# export AZKABAN_PROJECTS_DIR="05_Projects/Active"
-# export AZKABAN_AUTO_OPEN="0"   # 1 = open vault notes in Obsidian after ops
-
-# ---- Optional: extra PATH entries (run AFTER framework PATH setup) ----
-# export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$PATH"
-
-# ---- Optional: persistent history location/permissions ----
-# HISTFILE="$HOME/.zsh_history"
-# HISTSIZE=10000
-# SAVEHIST=10000
-
-# ---- Optional: tool-specific configuration ----
-# export NVM_DIR="$HOME/.nvm"        # nvm home (lazy-loaded on first use)
-# export _ZO_DATA_DIR="$HOME/.local/share/zoxide"  # zoxide database location
-
-# ---- Anything else machine-specific goes here ----
+# ---- Example: your own aliases ----
 # alias ll='ls -lhF --color=auto'
+
+# ---- Example: override a framework function ----
+# dev_clean() {
+#   echo "custom dev_clean for this machine"
+# }

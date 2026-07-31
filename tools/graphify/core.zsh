@@ -19,7 +19,7 @@ typeset -g _ZSH_TOOL_GRAPHIFY_CORE=1
 # -----------------------------
 # Config
 # -----------------------------
-export AZKABAN_DIR="${AZKABAN_DIR:-$HOME/azkaban}"
+export AZKABAN_DIR="${AZKABAN_DIR:-${AZKABAN_VAULT:-$HOME/azkaban}}"
 export GRAPHIFY_WORKSPACE="${GRAPHIFY_WORKSPACE:-04_AI_Workspace/Graphify}"
 export GRAPHIFY_DEFAULT_BACKEND="${GRAPHIFY_DEFAULT_BACKEND:-}"   # examples: ollama, claude-cli, gemini, openai
 export GRAPHIFY_CODE_STAGE="${GRAPHIFY_CODE_STAGE:-${XDG_CACHE_HOME:-$HOME/.cache}/graphify-staging}"
@@ -66,6 +66,83 @@ _gf_require_graph() {
     echo "  gffull <backend>"
     return 1
   }
+}
+
+# -----------------------------
+# Build-transaction helpers (shared by gffull/gfupdate/gfcode)
+# -----------------------------
+
+# A generated graphify-out/ is only trusted if it actually has content and
+# graph.json parses as JSON. Directory-existence alone is not enough — a
+# crashed/partial `graphify` run can leave an empty or truncated directory.
+_gf_validate_output() {
+  local dir="$1"
+  if [[ ! -s "$dir/graph.json" ]]; then
+    echo "Validation failed: missing or empty $dir/graph.json"
+    return 1
+  fi
+  if ! python3 -m json.tool < "$dir/graph.json" >/dev/null 2>&1; then
+    echo "Validation failed: $dir/graph.json is not valid JSON"
+    return 1
+  fi
+  if [[ ! -s "$dir/GRAPH_REPORT.md" ]]; then
+    echo "Validation failed: missing or empty $dir/GRAPH_REPORT.md"
+    return 1
+  fi
+  return 0
+}
+
+# Fresh, private, unpredictable staging directory (mktemp -d, not a
+# deterministic slug/hash path) so a local attacker can't pre-plant a
+# symlink at a path staging is about to write into.
+_gf_make_stage() {
+  local stage_root="${GRAPHIFY_CODE_STAGE:-${XDG_CACHE_HOME:-$HOME/.cache}/graphify-staging}"
+  mkdir -p -- "$stage_root" || return 1
+  local stage
+  stage="$(mktemp -d "$stage_root/run.XXXXXXXX")" || return 1
+  chmod 700 -- "$stage" 2>/dev/null
+  print -r -- "$stage"
+}
+
+# Transactional swap: validate new_dir, back up target (if present), move
+# new_dir into place, drop the backup only once the move succeeded. On any
+# failure the previous target is restored so a failed/interrupted build
+# never destroys a previously-good graphify-out/.
+_gf_install_output() {
+  local new_dir="$1" target="$2"
+  _gf_validate_output "$new_dir" || return 1
+
+  local backup="${target}.backup.$$"
+  if [[ -e "$target" ]]; then
+    mv -- "$target" "$backup" || return 1
+  fi
+
+  if mv -- "$new_dir" "$target"; then
+    rm -rf -- "$backup"
+    return 0
+  fi
+
+  rm -rf -- "$target"
+  [[ -e "$backup" ]] && mv -- "$backup" "$target"
+  return 1
+}
+
+# Minimal YAML scalar escaper for frontmatter values interpolated from
+# user-controlled project names/paths (mirrors Obsidian's _obs_yaml_escape).
+_gf_yaml_escape() {
+  print -rn -- "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' '
+}
+
+# A project "name" ends up directly in Azkaban note filenames (e.g.
+# "Project Graph - $name.md"). Reject '/' and '..' up front so a
+# crafted name can't escape 05_Projects/Active/ into an arbitrary path.
+_gf_validate_name() {
+  local name="$1"
+  if [[ "$name" == */* || "$name" == *..* ]]; then
+    echo "Invalid project name (must not contain '/' or '..'): $name" >&2
+    return 1
+  fi
+  return 0
 }
 
 # Safe managed-section updates in Markdown files.

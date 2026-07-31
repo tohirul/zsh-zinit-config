@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# ponytail: test-only network trap, not a real curl
+echo "curl $*" >> "${ZSH_TEST_NETWORK_LOG:?ZSH_TEST_NETWORK_LOG not set}"
+exit 1

@@ -33,15 +33,25 @@ else
 fi
 
 # ------------------------------------------------------------
-# 2. local.zsh (machine-local config)
+# 2. local.env.zsh + local.zsh (machine-local config)
 # ------------------------------------------------------------
 echo
-echo "[2/4] Machine-local config (local.zsh)"
+echo "[2/4] Machine-local config (local.env.zsh, local.zsh)"
+if [[ ! -f "$ZSH_HOME/local.env.zsh" ]]; then
+  if [[ -f "$ZSH_HOME/local.env.zsh.example" ]]; then
+    cp "$ZSH_HOME/local.env.zsh.example" "$ZSH_HOME/local.env.zsh"
+    echo "  Created: $ZSH_HOME/local.env.zsh (from local.env.zsh.example)."
+    echo "  Edit it to set AZKABAN_VAULT etc."
+  else
+    echo "  Skipped: local.env.zsh.example not found; create local.env.zsh manually."
+  fi
+else
+  echo "  Already present: $ZSH_HOME/local.env.zsh (leaving untouched)."
+fi
 if [[ ! -f "$ZSH_HOME/local.zsh" ]]; then
   if [[ -f "$ZSH_HOME/local.zsh.example" ]]; then
     cp "$ZSH_HOME/local.zsh.example" "$ZSH_HOME/local.zsh"
     echo "  Created: $ZSH_HOME/local.zsh (from local.zsh.example)."
-    echo "  Edit it to set AZKABAN_VAULT etc."
   else
     echo "  Skipped: local.zsh.example not found; create local.zsh manually."
   fi

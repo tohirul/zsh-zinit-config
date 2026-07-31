@@ -11,8 +11,18 @@ REPO_ROOT="${0:A:h:h}"
 export ZSH_HOME="$REPO_ROOT"
 
 source "$ZSH_HOME/tests/test_helper.zsh"
+source "$ZSH_HOME/lib/errors.zsh"
+source "$ZSH_HOME/lib/utils.zsh"
 source "$ZSH_HOME/tools/obsidian.zsh"
 source "$ZSH_HOME/tools/graphify.zsh"
+source "$ZSH_HOME/tools/node.zsh"
+source "$ZSH_HOME/tools/python.zsh"
+source "$ZSH_HOME/tools/docker.zsh"
+source "$ZSH_HOME/tools/git.zsh"
+source "$ZSH_HOME/tools/gpu.zsh"
+source "$ZSH_HOME/tools/vscode.zsh"
+source "$ZSH_HOME/tools/opencode.zsh"
+source "$ZSH_HOME/functions.zsh"
 
 for case in "$ZSH_HOME"/tests/cases/*.zsh; do
   [[ -f "$case" ]] || continue

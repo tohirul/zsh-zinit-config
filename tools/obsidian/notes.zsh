@@ -6,8 +6,12 @@ typeset -g _ZSH_TOOL_OBSIDIAN_NOTES=1
 
 obs-home() {
   _obs_require_vault || return 1
-  xdg-open "$AZKABAN_VAULT" >/dev/null 2>&1 &
-  _obs_ok "Opened vault folder: $AZKABAN_VAULT"
+  if _obs_auto_open_enabled; then
+    xdg-open "$AZKABAN_VAULT" >/dev/null 2>&1 &
+    _obs_ok "Opened vault folder: $AZKABAN_VAULT"
+  else
+    _obs_info "Not opening (set AZKABAN_AUTO_OPEN=1 to auto-open): $AZKABAN_VAULT"
+  fi
 }
 
 obs-open() {
@@ -16,8 +20,12 @@ obs-open() {
   local target="$1"
 
   if [[ -z "$target" ]]; then
-    xdg-open "obsidian://open?vault=$(_obs_urlencode "$OBSIDIAN_VAULT_NAME")" >/dev/null 2>&1 &
-    _obs_ok "Opened Obsidian vault: $OBSIDIAN_VAULT_NAME"
+    if _obs_auto_open_enabled; then
+      xdg-open "obsidian://open?vault=$(_obs_urlencode "$OBSIDIAN_VAULT_NAME")" >/dev/null 2>&1 &
+      _obs_ok "Opened Obsidian vault: $OBSIDIAN_VAULT_NAME"
+    else
+      _obs_info "Not opening (set AZKABAN_AUTO_OPEN=1 to auto-open): $OBSIDIAN_VAULT_NAME"
+    fi
     return 0
   fi
 
@@ -28,8 +36,8 @@ obs-open() {
     return 1
   fi
 
-  _obs_open_file "$file"
-  _obs_ok "Opened note: $target"
+  _obs_maybe_open_file "$file"
+  _obs_auto_open_enabled && _obs_ok "Opened note: $target"
 }
 
 obs-today() {
@@ -77,7 +85,7 @@ MD
     _obs_info "Daily note already exists: $AZKABAN_DAILY_DIR/$(_obs_date).md"
   fi
 
-  _obs_open_file "$file"
+  _obs_maybe_open_file "$file"
 }
 
 obs-capture() {
@@ -166,7 +174,7 @@ MD
     _obs_info "Note already exists: $AZKABAN_NOTES_DIR/$slug.md"
   fi
 
-  _obs_open_file "$file"
+  _obs_maybe_open_file "$file"
 }
 
 obs-find() {

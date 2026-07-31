@@ -10,10 +10,14 @@ typeset -g _ZSH_TOOL_NODE=1
 # ----------------------------
 
 _node_guard() {
-  command -v node >/dev/null 2>&1 || {
-    echo "[node] Node not available (nvm not loaded?)"
-    return 1
-  }
+  # `command -v node` would always succeed once the node() wrapper below
+  # is defined (it matches functions too), so this checks for a real
+  # executable instead — loading nvm first if node isn't on PATH yet.
+  [[ -n "$(_node_real_command node)" ]] && return 0
+  _load_nvm
+  [[ -n "$(_node_real_command node)" ]] && return 0
+  echo "[node] Node not available (nvm not loaded?)"
+  return 1
 }
 
 _pkg_guard() {
@@ -34,19 +38,76 @@ _pkg_guard() {
 # ----------------------------
 # Lazy nvm loading
 # ----------------------------
+# _ZSH_NVM_LOADED (not `${+functions[nvm]}`) tracks readiness: our own
+# lazy `nvm()` wrapper below is itself a function, so function-existence
+# alone can't tell "not loaded yet" from "loaded" — only an explicit flag
+# set right after a successful `. nvm.sh` can.
+
+_node_nvm_ready() {
+  (( ${_ZSH_NVM_LOADED:-0} ))
+}
 
 _load_nvm() {
-  export NVM_DIR="$HOME/.nvm"
+  _node_nvm_ready && return 0
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
   [[ -s "$NVM_DIR/nvm.sh" ]] || return 1
-  . "$NVM_DIR/nvm.sh"
+  . "$NVM_DIR/nvm.sh" || return 1
+  typeset -g _ZSH_NVM_LOADED=1
+  return 0
+}
+
+# Real executable on PATH, never a shell function (a wrapper of the same
+# name would otherwise make `command -v` lie about availability).
+_node_real_command() {
+  whence -p "$1" 2>/dev/null
+}
+
+# Try the real executable first; only pay for `_load_nvm` when it's
+# actually missing, and never touch/unset the calling wrapper — a failed
+# load must leave the wrapper callable (and retryable) instead of
+# disappearing for the rest of the session.
+_node_dispatch() {
+  local command_name="$1"
+  shift
+
+  local real
+  real="$(_node_real_command "$command_name")"
+  if [[ -n "$real" ]]; then
+    "$real" "$@"
+    return $?
+  fi
+
+  if ! _load_nvm; then
+    echo "[node] '$command_name' not found and nvm is not available (expected \$NVM_DIR/nvm.sh)" >&2
+    return 127
+  fi
+
+  real="$(_node_real_command "$command_name")"
+  if [[ -z "$real" ]]; then
+    echo "[node] '$command_name' still not available after loading nvm" >&2
+    return 127
+  fi
+
+  "$real" "$@"
 }
 
 # Safe command wrappers
-node() { unset -f node; _load_nvm; command -v node >/dev/null && command node "$@" || return 127; }
-npm()  { unset -f npm;  _load_nvm; command -v npm  >/dev/null && command npm  "$@" || return 127; }
-pnpm() { unset -f pnpm; _load_nvm; command -v pnpm >/dev/null && command pnpm "$@" || return 127; }
-bun()  { unset -f bun;  _load_nvm; command -v bun  >/dev/null && command bun  "$@" || return 127; }
-nvm()  { unset -f nvm;  _load_nvm || return 127; nvm  "$@"; }
+node() { _node_dispatch node "$@"; }
+npm()  { _node_dispatch npm  "$@"; }
+pnpm() { _node_dispatch pnpm "$@"; }
+bun()  { _node_dispatch bun  "$@"; }
+yarn() { _node_dispatch yarn "$@"; }
+
+# nvm itself is a shell function, not an executable — dispatch through
+# _load_nvm directly. Real nvm.sh redefines `nvm` when sourced, so the
+# recursive call below resolves to the real implementation once loaded.
+nvm() {
+  if ! _load_nvm; then
+    echo "[node] nvm not installed (expected \$NVM_DIR/nvm.sh)" >&2
+    return 1
+  fi
+  nvm "$@"
+}
 
 nvm_use() {
   _load_nvm || {
@@ -90,14 +151,14 @@ ni() {
   _pkg_guard || return 1
   local pm
   pm=$(node_pm) || return 1
-  command "$pm" install "$@"
+  _node_dispatch "$pm" install "$@"
 }
 
 nr() {
   _pkg_guard || return 1
   local pm
   pm=$(node_pm) || return 1
-  command "$pm" run "$@"
+  _node_dispatch "$pm" run "$@"
 }
 
 ndev()   { nr dev; }
@@ -181,10 +242,10 @@ node_run_all() {
   }
 
   case "$pm" in
-    npm)  command npm -ws run "$script" ;;
-    pnpm) command pnpm -r run "$script" ;;
-    yarn) command yarn workspaces foreach run "$script" ;;
-    bun)  command bun --filter '*' run "$script" ;;
+    npm)  _node_dispatch npm -ws run "$script" ;;
+    pnpm) _node_dispatch pnpm -r run "$script" ;;
+    yarn) _node_dispatch yarn workspaces foreach run "$script" ;;
+    bun)  _node_dispatch bun --filter '*' run "$script" ;;
     *)    echo "[node] Unsupported PM for workspaces: $pm"; return 1 ;;
   esac
 }

@@ -11,8 +11,11 @@ typeset -g _ZSH_TOOL_GRAPHIFY_AZKABAN=1
 gfaz() {
   local name="${1:-$(basename "$(_gf_root)")}"
   local explicit_note="${2:-}"
+  _gf_validate_name "$name" || return 1
   local root="$(_gf_abs "$(_gf_root)")" || return 1
   local slug="$(_gf_slug "$name")"
+  local name_esc="$(_gf_yaml_escape "$name")"
+  local root_esc="$(_gf_yaml_escape "$root")"
 
   local hub_rel="$GRAPHIFY_WORKSPACE/README"
   local meta_rel="$GRAPHIFY_WORKSPACE/$slug/metadata"
@@ -38,9 +41,9 @@ gfaz() {
   cat > "$meta_note" <<EOF
 ---
 type: graphify-project
-project: $name
-source_repo: $root
-generated_graph_runtime: $root/graphify-out
+project: "$name_esc"
+source_repo: "$root_esc"
+generated_graph_runtime: "$root_esc/graphify-out"
 status: active
 updated: $stamp
 ---
@@ -90,8 +93,8 @@ EOF
   cat > "$graph_note" <<EOF
 ---
 type: graphify-index
-project: $name
-source_repo: $root
+project: "$name_esc"
+source_repo: "$root_esc"
 graphify_metadata: $meta_rel
 status: active
 updated: $stamp
@@ -162,6 +165,7 @@ EOF
 # Optional, explicit artifact copy into Azkaban. Never runs from gfaz/gfship.
 gfazcopy() {
   local name="${1:-$(basename "$(_gf_root)")}"
+  _gf_validate_name "$name" || return 1
   local root="$(_gf_abs "${2:-$(_gf_root)}")" || return 1
   local slug="$(_gf_slug "$name")"
   local dest="$AZKABAN_DIR/$GRAPHIFY_WORKSPACE/$slug/artifacts"
@@ -194,6 +198,7 @@ gfazcopy() {
 # Inspect project/Azkaban bridge state.
 gfazstatus() {
   local name="${1:-$(basename "$(_gf_root)")}"
+  _gf_validate_name "$name" || return 1
   local root="$(_gf_abs "$(_gf_root)")" || return 1
   local slug="$(_gf_slug "$name")"
 
@@ -224,6 +229,7 @@ gfazstatus() {
 # Does NOT copy artifacts into Azkaban (use gfazcopy explicitly for that).
 gfship() {
   local name="${1:-$(basename "$(_gf_root)")}"
+  _gf_validate_name "$name" || return 1
   local root="$(_gf_abs "${2:-$(_gf_root)}")" || return 1
 
   gfcode "$root" || return 1
@@ -238,6 +244,7 @@ gfobsidian() {
   _gf_need graphify || return 1
 
   local name="${1:-$(basename "$(_gf_root)")}"
+  _gf_validate_name "$name" || return 1
   local backend="${2:-$GRAPHIFY_DEFAULT_BACKEND}"
   local root="$(_gf_abs "${3:-$(_gf_root)}")" || return 1
   local slug="$(_gf_slug "$name")"

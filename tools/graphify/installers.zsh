@@ -22,53 +22,60 @@ gfinitignore() {
   local root="$(_gf_abs "${1:-$(_gf_root)}")" || return 1
   cd "$root" || return 1
 
-  [[ -f .graphifyignore ]] && cp .graphifyignore ".graphifyignore.bak.$(date +%Y%m%d-%H%M%S)"
+  # Idempotent: each required entry is checked and appended independently,
+  # so re-running never clobbers custom entries a user already added and
+  # never needs a timestamped backup copy.
+  local -a required=(
+    '.git/'
+    'node_modules/'
+    '**/node_modules/'
+    '.next/'
+    '**/.next/'
+    'dist/'
+    'build/'
+    'coverage/'
+    '.cache/'
+    '.turbo/'
+    '.DS_Store'
+    'graphify-out/'
+    '.graphify-code-only/'
+    '.env'
+    '.env.*'
+    '**/.env'
+    '**/.env.*'
+    '**/*secret*'
+    '**/*token*'
+    '**/*credentials*'
+    '**/*.key'
+    '**/*.pem'
+    '**/*.p12'
+    '**/*.pfx'
+    '**/*.zip'
+    '**/*.tar'
+    '**/*.tar.gz'
+    '**/*.7z'
+    '**/*.log'
+  )
 
-  cat > .graphifyignore <<'EOF'
-# Graphify ignores
-.git/
-node_modules/
-**/node_modules/
-.next/
-**/.next/
-dist/
-build/
-coverage/
-.cache/
-.turbo/
-.DS_Store
+  [[ -f .graphifyignore ]] || : > .graphifyignore
+  local entry added=0
+  for entry in "${required[@]}"; do
+    grep -qxF -- "$entry" .graphifyignore 2>/dev/null || {
+      print -r -- "$entry" >> .graphifyignore
+      ((added++))
+    }
+  done
+  echo "Checked: $root/.graphifyignore ($added entr$([[ $added == 1 ]] && echo y || echo ies) added)"
 
-# Graphify runtime
-graphify-out/
-.graphify-code-only/
-
-# Secrets / local env
-.env
-.env.*
-**/.env
-**/.env.*
-**/*secret*
-**/*token*
-**/*.key
-**/*.pem
-
-# Heavy/generated files
-**/*.zip
-**/*.tar
-**/*.tar.gz
-**/*.7z
-**/*.log
-EOF
-
-  grep -qxF 'graphify-out/' .gitignore 2>/dev/null || cat >> .gitignore <<'EOF'
-
-# Graphify local outputs
-graphify-out/
-.graphify-code-only/
-EOF
-
-  echo "Created: $root/.graphifyignore"
-  echo "Updated: $root/.gitignore"
+  [[ -f .gitignore ]] || : > .gitignore
+  local gitignore_added=0
+  for entry in 'graphify-out/' '.graphify-code-only/'; do
+    grep -qxF -- "$entry" .gitignore 2>/dev/null || {
+      print -r -- "$entry" >> .gitignore
+      ((gitignore_added++))
+    }
+  done
+  echo "Checked: $root/.gitignore ($gitignore_added entr$([[ $gitignore_added == 1 ]] && echo y || echo ies) added)"
 }
 
 gfhook() {
@@ -94,10 +101,16 @@ gfagents() {
   echo "Installing Graphify assistant instructions in:"
   echo "  $root"
 
-  graphify claude install 2>/dev/null || graphify install --project 2>/dev/null || true
-  graphify codex install 2>/dev/null || graphify install --platform codex --project 2>/dev/null || true
-  graphify opencode install 2>/dev/null || graphify install --platform opencode --project 2>/dev/null || true
+  local -a failed=()
+  graphify claude install 2>/dev/null || graphify install --project 2>/dev/null || failed+=(claude)
+  graphify codex install 2>/dev/null || graphify install --platform codex --project 2>/dev/null || failed+=(codex)
+  graphify opencode install 2>/dev/null || graphify install --platform opencode --project 2>/dev/null || failed+=(opencode)
 
   echo "Check changes:"
   echo "  git status --short"
+
+  if (( ${#failed[@]} )); then
+    echo "Failed to install instructions for: ${failed[*]}"
+    return 1
+  fi
 }

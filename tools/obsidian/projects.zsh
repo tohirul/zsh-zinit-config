@@ -119,12 +119,18 @@ obs-project-bind() {
   local meta_dir="$project_path/.azkaban"
   local meta_file="$meta_dir/project.md"
   local remote branch repo_name index index_rel note_link index_link cortext_link workflow_link
+  local project_name_esc project_path_esc repo_name_esc branch_esc remote_esc
 
   mkdir -p "$meta_dir"
 
   repo_name="${project_path:t}"
   remote="$(_obs_git_remote "$project_path")"
   branch="$(_obs_git_branch "$project_path")"
+  project_name_esc="$(_obs_md_table_escape "$project_name")"
+  project_path_esc="$(_obs_md_table_escape "$project_path")"
+  repo_name_esc="$(_obs_md_table_escape "$repo_name")"
+  branch_esc="$(_obs_md_table_escape "${branch:-none}")"
+  remote_esc="$(_obs_md_table_escape "${remote:-none}")"
 
   index="$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR/_index.md"
   index_rel="$AZKABAN_PROJECTS_DIR/_index.md"
@@ -172,8 +178,8 @@ This local repository is connected to an existing Obsidian project note.
 
 | Field | Value |
 |---|---|
-| Project | $project_name |
-| Local Path | \`$project_path\` |
+| Project | $project_name_esc |
+| Local Path | \`$project_path_esc\` |
 | Vault | \`$AZKABAN_VAULT\` |
 | Note | \`$note_rel\` |
 | Connected | $(_obs_datetime) |
@@ -189,11 +195,11 @@ MD
     print -r -- ""
     print -r -- "| Field | Value |"
     print -r -- "|---|---|"
-    print -r -- "| Project | $project_name |"
-    print -r -- "| Local Repo | \`$project_path\` |"
-    print -r -- "| Repo Folder | \`$repo_name\` |"
-    print -r -- "| Git Branch | \`${branch:-none}\` |"
-    print -r -- "| Git Remote | \`${remote:-none}\` |"
+    print -r -- "| Project | $project_name_esc |"
+    print -r -- "| Local Repo | \`$project_path_esc\` |"
+    print -r -- "| Repo Folder | \`$repo_name_esc\` |"
+    print -r -- "| Git Branch | \`$branch_esc\` |"
+    print -r -- "| Git Remote | \`$remote_esc\` |"
     print -r -- "| Connected | $(_obs_datetime) |"
     print -r -- ""
     print -r -- "## Graph Connections"
@@ -304,7 +310,7 @@ obs-project-snapshot() {
 
   local slug="$(_obs_slug "$project_name")"
   local dir="$AZKABAN_VAULT/$AZKABAN_PROJECTS_DIR/$slug"
-  local file="$dir/snapshot-$(_obs_date)-$(date +%H%M%S).md"
+  local file="$dir/snapshot-$(_obs_date)-$(date +%H%M%S-%N).md"
   local snapshot_rel="${file#$AZKABAN_VAULT/}"
   local name_esc path_esc
 

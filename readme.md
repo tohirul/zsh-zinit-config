@@ -1,6 +1,6 @@
 # Zsh Developer Framework (Ubuntu)
 
-A **production-grade Zsh framework** for software and web developers on **Ubuntu**.
+A Zsh framework for software and web developers on **Ubuntu**.
 
 This is **not** an Oh-My-Zsh preset or a random plugin collection. It is a **clean, modular, performance-focused shell framework** built to be:
 
@@ -10,7 +10,10 @@ This is **not** an Oh-My-Zsh preset or a random plugin collection. It is a **cle
 - Extensible
 - Free of shell-startup side effects
 
-This repository represents a **frozen, stable baseline**.
+Every claim below (startup contract, test coverage, audit checks) is
+verified by `zsh tests/run.zsh` and `zsh_audit` — run them yourself to
+check the current state; see [CHANGELOG.md](CHANGELOG.md) for what
+changed and when.
 
 ---
 
@@ -36,14 +39,18 @@ This repository represents a **frozen, stable baseline**.
 ### Tooling
 - Git helpers
 - Docker & Docker Compose helpers
-- Node.js (nvm-based, multi-PM)
-- Python (Conda-only, manual activation)
+- Node.js (nvm-based, multi-PM: npm/pnpm/yarn/bun, real-executable detection)
+- Python (Conda-only, manual activation, base-env install guard)
 - System diagnostics (Ubuntu)
-- VS Code CLI helpers
+- VS Code CLI helpers (atomic settings writes)
 - NVIDIA PRIME GPU launchers (`prun`, `codegpu`, `chromevk`, …)
-- Obsidian / Azkaban automation (`obs-*` commands, `az*` aliases)
-- Graphify project-graph workflow (`gf*` commands) — code graphs + Azkaban bridge notes
-- Framework self-audit (`zsh_audit` / `dev_doctor`)
+- Obsidian / Azkaban automation (`obs-*` commands, `az*` aliases) —
+  transactional managed-block writes, truthy `obs-sync`
+- Graphify project-graph workflow (`gf*` commands) — code graphs + Azkaban
+  bridge notes, transactional builds with rollback, sandboxed staging
+- Pinned Zinit plugin lifecycle (`plugins.lock` + `scripts/install-plugins.zsh`)
+  — startup never clones a plugin
+- Framework self-audit (`zsh_audit` / `dev_doctor`, 21 checks)
 - Hermetic regression suite (`zsh tests/run.zsh`)
 
 ---
@@ -55,6 +62,9 @@ This repository represents a **frozen, stable baseline**.
 ├── aliases.zsh          # simple, non-conflicting aliases (incl. az*/gf*)
 ├── functions.zsh        # user workflows
 ├── zsh_backuprc.zsh     # clean snapshot of ~/.zshrc (thin orchestrator)
+├── local.env.zsh.example # early (variable-only) machine-local config template
+├── local.zsh.example    # late (alias/function) machine-local config template
+├── plugins.lock         # pinned Zinit plugin revisions
 ├── lib/
 │   ├── errors.zsh       # shared error helpers
 │   └── utils.zsh        # shared utilities
@@ -80,8 +90,13 @@ This repository represents a **frozen, stable baseline**.
 ### Design Rules
 - `.zshrc` is an orchestrator, not a script
 - No tool runs unless explicitly called
-- Plugins are async and non-blocking
+- Plugins are async and non-blocking, and are only ever *loaded* from
+  startup if already installed — a missing plugin prints one warning
+  instead of being cloned on the spot (see `scripts/install-plugins.zsh`)
 - Functions own logic; aliases never shadow functions
+- Early config (`local.env.zsh`, variables only) loads before Zinit/tools
+  resolve their defaults; late config (`local.zsh`, aliases/functions)
+  loads last
 
 ---
 
@@ -226,8 +241,8 @@ node_info
 py_health
 fzf_cd
 dev_health
-zsh_audit   # full framework self-diagnostic (syntax, duplication, collisions, startup time)
-zsh tests/run.zsh   # hermetic regression suite (85 assertions)
+zsh_audit   # full framework self-diagnostic — 21 checks (syntax, duplication, collisions, startup time, ...)
+zsh tests/run.zsh   # hermetic regression suite (run it — the assertion count changes as the suite grows)
 ```
 
 All commands should work immediately.
@@ -238,19 +253,20 @@ All commands should work immediately.
 
 ---
 
-## 🔒 Baseline Status
+## 🔒 Data-safety & security notes
 
-This configuration is **frozen** as a baseline.
-
-- No changes unless explicitly requested
-- All future improvements must be additive
-- No breaking refactors
-
-Suggested tag:
-
-```
-zsh-baseline-ubuntu-v1
-```
+- Graphify (`gfcode`/`gffull`) builds into a private, unpredictable staging
+  location and only replaces `graphify-out/` after the new build validates
+  (non-empty, JSON-parseable) — a failed or interrupted build leaves the
+  previous graph intact. Staging rejects symlinks, out-of-root paths,
+  non-regular files, oversized files, and secret-looking filenames.
+- Obsidian managed-block writes (`_obs_append_or_replace_block`, used by
+  project binding/snapshots) validate marker counts before touching a note;
+  a malformed block (missing/duplicate markers) is refused and the file is
+  left byte-for-byte unchanged, rather than silently truncated.
+- `obs-sync` checks the exit code of every `git` step and only prints
+  "Vault synced." when the pull/push actually succeeded.
+- Startup never clones a Zinit plugin — see `scripts/install-plugins.zsh`.
 
 ---
 

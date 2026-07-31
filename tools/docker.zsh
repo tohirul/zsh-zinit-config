@@ -140,16 +140,33 @@ dsize() {
 
 # ---------- project utilities ----------
 # dreset-project — rebuilds the project's compose stack. Volume removal is
-# OPT-IN (pass --volumes, or set DRESET_VOLUMES=1); always confirms first.
+# OPT-IN (pass --volumes, or set DRESET_VOLUMES=1); always confirms first
+# unless --dry-run is passed. DRESET_VOLUMES is compared by value ("1"),
+# not by non-emptiness — DRESET_VOLUMES=0 must NOT remove volumes.
 dreset-project() {
   _docker_guard || return
   _compose_guard || return
 
-  local do_volumes=0
-  case "$1" in
-    --volumes|-v) do_volumes=1 ;;
-  esac
-  [[ -n "$DRESET_VOLUMES" ]] && do_volumes=1
+  local do_volumes=0 dry_run=0 arg
+  for arg in "$@"; do
+    case "$arg" in
+      --volumes|-v) do_volumes=1 ;;
+      --dry-run|-n) dry_run=1 ;;
+    esac
+  done
+  [[ "${DRESET_VOLUMES:-0}" == 1 ]] && do_volumes=1
+
+  if (( dry_run )); then
+    echo "Dry run — would run:"
+    if (( do_volumes )); then
+      echo "  docker compose down -v"
+    else
+      echo "  docker compose down"
+    fi
+    echo "  docker compose build --no-cache"
+    echo "  docker compose up -d"
+    return 0
+  fi
 
   echo "⚠️  Rebuild: containers will be recreated; $( ((do_volumes)) && echo 'VOLUMES WILL BE REMOVED' || echo 'volumes are kept' )."
   read "?Continue? [y/N]: " ans
@@ -160,9 +177,10 @@ dreset-project() {
     docker compose down -v
   else
     docker compose down
-  fi
-  docker compose build --no-cache
-  docker compose up -d
+  fi || { echo "[docker] 'compose down' failed; stopping."; return 1; }
+
+  docker compose build --no-cache || { echo "[docker] 'compose build' failed; stopping."; return 1; }
+  docker compose up -d || { echo "[docker] 'compose up' failed."; return 1; }
 }
 
 # ---------- dev helpers ----------

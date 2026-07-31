@@ -1,0 +1,25 @@
+# ============================================================
+# plugins.lock — pinned Zinit plugin revisions
+#
+# One line per plugin: "<github-user>/<repo> <commit-sha>". Read by
+# scripts/install-plugins.zsh (manual, never sourced from
+# zsh_backuprc.zsh). zsh_backuprc.zsh only ever loads a plugin whose
+# clone directory already exists under
+# $ZINIT_HOME:h/plugins/<user>---<repo> — it never clones.
+#
+# Refresh a pin deliberately with:
+#   git ls-remote https://github.com/<user>/<repo>.git HEAD
+# then re-run scripts/install-plugins.zsh.
+# ============================================================
+zdharma-continuum/zinit-annex-as-monitor e1f9b7274f4df3d15c92d46c49f52ce58f947766
+zdharma-continuum/zinit-annex-bin-gem-node 89739902eafacb3c9c389f896177fb25e8a95f38
+zdharma-continuum/zinit-annex-patch-dl ddb174be3aa308e7428691216f09aa69e8e2f94f
+zsh-users/zsh-autosuggestions 85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5
+zsh-users/zsh-completions 6ea4709fbc64f813ffa013fdd062fa0f0d9a0dab
+zdharma-continuum/fast-syntax-highlighting 3d574ccf48804b10dca52625df13da5edae7f553
+junegunn/fzf e36576429dbdcb447b05b999f266e1c2913b543b
+ajeetdsouza/zoxide cf086b057dfcc7c306450c70829b2788a3e64219
+changyuheng/zsh-interactive-cd e7d4802aa526ec069dafec6709549f4344ce9d4a
+zsh-users/zsh-history-substring-search 14c8d2e0ffaee98f2df9850b19944f32546fdea5
+ohmyzsh/ohmyzsh c5ba74cf02cce4c342153f79089100194f30940f
+romkatv/powerlevel10k 9253fb1c5034410c43a0c681ff8294181c54016c

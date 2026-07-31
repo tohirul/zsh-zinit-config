@@ -11,7 +11,7 @@
 | `sync.zsh`  | `obs-sync` (git vault sync)                           |
 | `aliases.zsh` | `az*` shortcuts                                     |
 
-## Vault layout (defaults, overridable in `local.zsh`)
+## Vault layout (defaults, overridable in `local.env.zsh`)
 
 ```
 ~/azkaban
@@ -37,11 +37,43 @@ etc.
 - **Graph**: `obs-graph-info` (vault note graph), `obs-connect-current`,
   `obs-log-current`, etc. for the current directory.
 - **Sync**: `obs-sync [--dry-run]` commits vault changes (dry-run never
-  commits).
+  commits). Every `git` step (add, commit, pull --rebase, push) is
+  exit-code-checked — `obs-sync` only prints "Vault synced." once the
+  pull and push actually succeeded, and returns non-zero (with a specific
+  error) on any failure, including a hook rejecting the commit or a
+  conflicted rebase.
 
 Wikilinks are written without the `.md` extension (Obsidian convention), e.g.
-`[[05_Projects/Active/my-project|My Project]]`.
+`[[05_Projects/Active/my-project|My Project]]`. Labels are sanitized (`]]`
+stripped, `|` replaced) so an untrusted label can't break wikilink syntax.
+
+## Managed blocks (data-safety)
 
 Managed blocks use HTML-comment fences:
-`<!-- AZKABAN:<BLOCK>:BEGIN --> … <!-- AZKABAN:<BLOCK>:END -->` so one block
-per key is always guaranteed.
+`<!-- AZKABAN:<BLOCK>:BEGIN --> … <!-- AZKABAN:<BLOCK>:END -->`. The
+rewriter (`_obs_append_or_replace_block`) only accepts two marker states:
+zero of each (appends a fresh block) or exactly one of each in the right
+order (replaces it). Anything else — a missing `END`, duplicate markers,
+reversed order — is refused outright and the note is left byte-for-byte
+unchanged; the write itself is atomic (same-directory temp file + rename),
+so an interrupted write can't leave a half-written note either.
+
+## Auto-open
+
+GUI/URI-handler launches (`obs-home`, `obs-open`, `obs-today`, `obs-note`)
+are gated behind `AZKABAN_AUTO_OPEN` (default `0`) — nothing opens unless
+you set `AZKABAN_AUTO_OPEN=1` in `local.env.zsh`.
+
+## Snapshots
+
+`obs-project-snapshot` filenames include a nanosecond timestamp
+(`snapshot-<date>-<time>-<nanoseconds>.md`), so two snapshots created in
+immediate succession never collide/overwrite each other.
+
+## Escaping
+
+YAML frontmatter values go through `_obs_yaml_escape` (backslashes,
+quotes, and embedded newlines). Markdown table cells (project bind's
+`.azkaban/project.md` and the note's `REPO-CONNECTION` block) go through
+`_obs_md_table_escape` (pipes, backticks, newlines) so a project name or
+branch name containing `|` or `` ` `` can't corrupt the table.

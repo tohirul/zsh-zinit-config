@@ -71,6 +71,10 @@ PY
 
 # ---------- vault open ----------
 
+_obs_auto_open_enabled() {
+  [[ "${AZKABAN_AUTO_OPEN:-0}" == 1 ]]
+}
+
 _obs_open_file() {
   local file="$1"
   local rel="${file#$AZKABAN_VAULT/}"
@@ -80,6 +84,18 @@ _obs_open_file() {
   encoded_file="$(_obs_urlencode "$rel")"
 
   xdg-open "obsidian://open?vault=${encoded_vault}&file=${encoded_file}" >/dev/null 2>&1 &
+}
+
+# Gated variant: only launches when AZKABAN_AUTO_OPEN=1. Every call site
+# that opens a GUI app/URI handler as a side effect of another command
+# (obs-today, obs-note, obs-open, obs-home, ...) should route through this
+# instead of calling xdg-open/_obs_open_file directly.
+_obs_maybe_open_file() {
+  if _obs_auto_open_enabled; then
+    _obs_open_file "$1"
+  else
+    _obs_info "Not opening (set AZKABAN_AUTO_OPEN=1 to auto-open notes)."
+  fi
 }
 
 # ---------- git helpers ----------

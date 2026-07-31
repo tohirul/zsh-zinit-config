@@ -120,16 +120,26 @@ code_settings_set() {
   [[ -f "$f" ]] || echo "{}" > "$f"
 
   code_settings_backup || return 1
-  tmp=$(mktemp)
+  # Same directory as the target so the final `mv` is an atomic rename,
+  # not a cross-filesystem copy (mktemp defaults to $TMPDIR).
+  tmp="$(mktemp "$(dirname "$f")/.settings.json.XXXXXXXX")" || return 1
   trap 'rm -f "$tmp"' EXIT
 
   # Values are passed as --arg/--argjson so the value can never inject jq code.
+  local write_ok=0
   if jq -e . >/dev/null 2>&1 <<<"$value"; then
-    jq --argjson value "$value" ".${key} = \$value" "$f" > "$tmp" && mv "$tmp" "$f"
+    jq --argjson value "$value" ".${key} = \$value" "$f" > "$tmp" && mv -- "$tmp" "$f" && write_ok=1
   else
-    jq --arg value "$value" ".${key} = \$value" "$f" > "$tmp" && mv "$tmp" "$f"
+    jq --arg value "$value" ".${key} = \$value" "$f" > "$tmp" && mv -- "$tmp" "$f" && write_ok=1
   fi
-  echo "[vscode] Updated setting: $key"
+
+  if (( write_ok )); then
+    echo "[vscode] Updated setting: $key"
+  else
+    echo "[vscode] Failed to update setting: $key (settings.json left unchanged)" >&2
+    rm -f -- "$tmp"
+    return 1
+  fi
 }
 
 # ----------------------------

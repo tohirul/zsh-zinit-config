@@ -36,7 +36,7 @@ prime-info() {
   echo " PRIME GPU STATUS"
   echo "========================================"
   echo "Session: $(_prime_session)"
-  echo "Prime Mode: $(sudo prime-select query 2>/dev/null || echo unknown)"
+  echo "Prime Mode: $(prime-select query 2>/dev/null || echo unknown)"
   echo
 
   if _prime_has_nvidia; then
@@ -80,7 +80,11 @@ prun-gl() {
     return 1
   fi
 
-  _prime_env "$@" --use-gl=desktop
+  if _prime_is_chromium_family "$1"; then
+    _prime_env "$@" --use-gl=desktop
+  else
+    _prime_env "$@"
+  fi
 }
 
 prun-vk() {
@@ -94,9 +98,25 @@ prun-vk() {
     return 1
   fi
 
-  _prime_env "$@" \
-    --enable-features=Vulkan \
-    --use-vulkan
+  if _prime_is_chromium_family "$1"; then
+    _prime_env "$@" \
+      --enable-features=Vulkan \
+      --use-vulkan
+  else
+    _prime_env "$@"
+  fi
+}
+
+# True for a Chromium/Electron-family binary (chrome, chromium, code,
+# electron apps, ...), where --use-gl/--enable-features=Vulkan flags are
+# meaningful. Any other target gets no extra flags — prun-gl/prun-vk are
+# labeled "generic" launchers and must not silently pass Chromium-only
+# CLI flags to an unrelated command.
+_prime_is_chromium_family() {
+  case "${1:t}" in
+    *chrome*|*chromium*|code|code-insiders|*electron*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 # ---------- app launchers ----------
@@ -157,9 +177,17 @@ prime-procs() {
 }
 
 prime-top() {
+  command -v nvtop >/dev/null 2>&1 || {
+    echo "[gpu] nvtop not installed"
+    return 1
+  }
   nvtop
 }
 
 prime-test() {
+  command -v glxinfo >/dev/null 2>&1 || {
+    echo "[gpu] glxinfo not installed (package: mesa-utils)"
+    return 1
+  }
   _prime_env glxinfo | grep "OpenGL renderer"
 }

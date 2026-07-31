@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# ponytail: only traps `git clone`; everything else falls through to the
+# real git so startup functions that legitimately call git (rev-parse,
+# branch, status, ...) keep working during the startup contract test.
+if [ "$1" = "clone" ]; then
+  echo "git clone $*" >> "${ZSH_TEST_NETWORK_LOG:?ZSH_TEST_NETWORK_LOG not set}"
+  exit 1
+fi
+exec "${ZSH_TEST_REAL_GIT:?ZSH_TEST_REAL_GIT not set}" "$@"

@@ -52,6 +52,19 @@ dev_clean() {
       ;;
   esac
 
+  if [[ "$mode" == "exec" ]]; then
+    case "$PWD" in
+      "$HOME"|/|/tmp)
+        echo "[dev_clean] Refusing to run destructively in $PWD." >&2
+        return 1
+        ;;
+    esac
+    if [[ "$(project_type)" == "unknown" && ! -e .git && ! -e composer.json && ! -e pyproject.toml ]]; then
+      echo "[dev_clean] Refusing: $PWD doesn't look like a project root (no package.json/Cargo.toml/go.mod/compose file/environment.yml/.git/composer.json/pyproject.toml)." >&2
+      return 1
+    fi
+  fi
+
   local targets=(
     node_modules
     .next

@@ -6,7 +6,9 @@ typeset -g _ZSH_TOOL_PYTHON=1
 
 # ---------- internal helpers ----------
 _conda_root() {
-  for p in "$HOME/anaconda3" "$HOME/miniconda3" "/opt/conda"; do
+  local p
+  for p in "$CONDA_ROOT" "$HOME/anaconda3" "$HOME/miniconda3" "/opt/conda"; do
+    [[ -n "$p" ]] || continue
     if [[ -x "$p/bin/conda" ]]; then
       echo "$p"
       return 0
@@ -15,8 +17,12 @@ _conda_root() {
   return 1
 }
 
+# Conda's own shell integration (etc/profile.d/conda.sh) defines `conda`
+# as a shell FUNCTION so `conda activate` can mutate the current shell —
+# a bare executable on PATH with no shell hook loaded can't activate
+# anything, so function-existence (not `command -v`) is the real signal.
 _conda_loaded() {
-  command -v conda >/dev/null 2>&1
+  (( ${+functions[conda]} ))
 }
 
 # ---------- lazy loader ----------
@@ -102,19 +108,58 @@ py_use_here() {
     return 1
   }
 
+  local env_name
+  env_name="$(<.conda-env)"
+
+  # Must be exactly one line, non-empty, and look like a conda env name
+  # (no shell metacharacters) — .conda-env can be hand-edited or written
+  # by another tool, so its content isn't trusted blindly before being
+  # handed to `conda activate`.
+  if [[ "$env_name" == *$'\n'* ]]; then
+    echo "[python] .conda-env must contain exactly one line"
+    return 1
+  fi
+  if [[ -z "$env_name" ]]; then
+    echo "[python] .conda-env is empty"
+    return 1
+  fi
+  if [[ ! "$env_name" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    echo "[python] .conda-env contains invalid characters: $env_name"
+    return 1
+  fi
+
   conda_load || return
-  conda activate "$(cat .conda-env)"
+  conda activate "$env_name"
 }
 
 # ---------- packages ----------
+
+# Refuse to install into an unspecified or base environment by default —
+# `conda install`/`pip install` with no active env silently lands in
+# base, which is easy to do by accident and hard to clean up.
+_py_require_active_env() {
+  if [[ -z "${CONDA_DEFAULT_ENV:-}" ]]; then
+    echo "[python] No active Conda environment. Run 'py_activate <env>' first." >&2
+    return 1
+  fi
+  if [[ "$CONDA_DEFAULT_ENV" == base && "${PY_ALLOW_BASE:-0}" != 1 ]]; then
+    echo "[python] Refusing to install into 'base'." >&2
+    echo "[python] Set PY_ALLOW_BASE=1 if this is intentional." >&2
+    return 1
+  fi
+  return 0
+}
+
 py_install() {
   conda_load || return
+  _py_require_active_env || return 1
   conda install "$@"
 }
 
 py_pip_install() {
   conda_load || return
-  pip install "$@"
+  _py_require_active_env || return 1
+  python -m pip install "$@"
 }
 
 py_freeze() {
