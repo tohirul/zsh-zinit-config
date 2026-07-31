@@ -117,6 +117,7 @@ source "$ZSH_HOME/tools/opencode.zsh"
 source "$ZSH_HOME/tools/dev-agent.zsh"
 source "$ZSH_HOME/tools/audit.zsh"
 source "$ZSH_HOME/tools/obsidian.zsh"
+source "$ZSH_HOME/tools/graphify.zsh"
 
 # ------------------------------------------------------------
 # User layer (aliases & custom functions)
