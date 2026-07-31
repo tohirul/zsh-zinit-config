@@ -1,6 +1,8 @@
 # ============================================================
 # Aliases (Ubuntu, Safe, No Function Collisions)
 # ============================================================
+[[ -n ${_ZSH_ALIASES:-} ]] && return
+typeset -g _ZSH_ALIASES=1
 
 # ----- core -----
 alias c='clear'
@@ -23,7 +25,7 @@ command -v bat >/dev/null 2>&1 && alias cat='bat'
 alias g='git'
 alias ga='git add'
 alias gc='git commit'
-alias gca='git commit --amend'
+# NOTE: gca is a function in tools/git.zsh (git commit --amend); no alias here to avoid shadowing.
 
 # ----- docker -----
 alias d='docker'
@@ -31,7 +33,6 @@ alias dc='docker compose'
 
 # ----- python -----
 alias py='python'
-alias pip='pip'
 
 # ----- system -----
 alias ports='ss -tulpn'

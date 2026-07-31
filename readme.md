@@ -40,6 +40,11 @@ This repository represents a **frozen, stable baseline**.
 - Python (Conda-only, manual activation)
 - System diagnostics (Ubuntu)
 - VS Code CLI helpers
+- NVIDIA PRIME GPU launchers (`prun`, `codegpu`, `chromevk`, …)
+- Obsidian / Azkaban automation (`obs-*` commands, `az*` aliases)
+- Graphify project-graph workflow (`gf*` commands) — code graphs + Azkaban bridge notes
+- Framework self-audit (`zsh_audit` / `dev_doctor`)
+- Hermetic regression suite (`zsh tests/run.zsh`)
 
 ---
 
@@ -47,21 +52,30 @@ This repository represents a **frozen, stable baseline**.
 
 ```text
 ~/.zsh
-├── aliases.zsh          # simple, non-conflicting aliases
+├── aliases.zsh          # simple, non-conflicting aliases (incl. az*/gf*)
 ├── functions.zsh        # user workflows
+├── zsh_backuprc.zsh     # clean snapshot of ~/.zshrc (thin orchestrator)
 ├── lib/
 │   ├── errors.zsh       # shared error helpers
 │   └── utils.zsh        # shared utilities
-└── tools/
-    ├── git.zsh
-    ├── docker.zsh
-    ├── node.zsh
-    ├── python.zsh
-    ├── system.zsh
-    └── vscode.zsh
+├── tools/
+│   ├── git.zsh
+│   ├── docker.zsh
+│   ├── node.zsh
+│   ├── python.zsh
+│   ├── system.zsh
+│   ├── vscode.zsh
+│   ├── obsidian.zsh     # loader → tools/obsidian/*.zsh
+│   └── graphify.zsh     # loader → tools/graphify/*.zsh
+├── scripts/             # standalone installers (bootstrap, zinit, graphify)
+├── tests/               # hermetic regression suite (zsh tests/run.zsh)
+└── docs/                # workflow docs
 
 ~/.zshrc                 # thin entrypoint
 ```
+
+`tools/obsidian/` and `tools/graphify/` are split into small parts
+(`core`, `markdown`, `notes`, …), each with its own source-once guard.
 
 ### Design Rules
 - `.zshrc` is an orchestrator, not a script
@@ -212,9 +226,15 @@ node_info
 py_health
 fzf_cd
 dev_health
+zsh_audit   # full framework self-diagnostic (syntax, duplication, collisions, startup time)
+zsh tests/run.zsh   # hermetic regression suite (85 assertions)
 ```
 
 All commands should work immediately.
+
+> `~/.zshrc` is a thin orchestrator that sources the modules in `~/.zsh`.
+> Every module carries a source-once guard, so it can never be duplicated by
+> repeated appends. Run `zsh_audit` any time to confirm the framework is healthy.
 
 ---
 
@@ -237,11 +257,12 @@ zsh-baseline-ubuntu-v1
 ## 🔮 Optional Extensions
 
 Not included in the baseline but supported cleanly:
-- direnv integration
 - atuin history
-- dotfiles bootstrap script
 - macOS port (separate baseline)
-- framework self-diagnostics
+
+Included now: dotfiles bootstrap (`scripts/bootstrap.zsh`), framework
+self-diagnostics (`zsh_audit`), hermetic tests, Obsidian/Azkaban and
+Graphify workflows.
 
 ---
 
@@ -254,4 +275,4 @@ Not included in the baseline but supported cleanly:
 
 ## 🧾 License
 
-MIT (or your preferred license)
+MIT — see [LICENSE](LICENSE).

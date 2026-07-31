@@ -2,6 +2,8 @@
 # Node.js Helpers (Drop-in, Hardened, OpenCode-safe)
 # Ubuntu / nvm / multi-PM / jq-guarded
 # ============================================================
+[[ -n ${_ZSH_TOOL_NODE:-} ]] && return
+typeset -g _ZSH_TOOL_NODE=1
 
 # ----------------------------
 # Guards
@@ -27,12 +29,7 @@ _pkg_guard() {
   fi
 }
 
-_jq_guard() {
-  command -v jq >/dev/null 2>&1 || {
-    echo "[node] jq is required but not installed"
-    return 1
-  }
-}
+# _jq_guard is provided by lib/utils.zsh
 
 # ----------------------------
 # Lazy nvm loading

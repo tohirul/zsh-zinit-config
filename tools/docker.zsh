@@ -1,6 +1,8 @@
 # ============================================================
 # Docker Helpers (Ubuntu, Compose v2)
 # ============================================================
+[[ -n ${_ZSH_TOOL_DOCKER:-} ]] && return
+typeset -g _ZSH_TOOL_DOCKER=1
 
 # ---------- guards ----------
 _docker_guard() {
@@ -11,10 +13,11 @@ _docker_guard() {
 }
 
 _compose_guard() {
-  [[ -f docker-compose.yml || -f docker-compose.yaml ]] || {
-    echo "[docker] No docker-compose file found"
-    return 1
-  }
+  for f in compose.yaml compose.yml docker-compose.yml docker-compose.yaml; do
+    [[ -f "$f" ]] && return 0
+  done
+  echo "[docker] No compose file found (compose.yaml/yml, docker-compose.yml/yaml)"
+  return 1
 }
 
 # ---------- basic ----------
@@ -74,6 +77,11 @@ dexec() {
   _docker_guard || return
   _compose_guard || return
   local svc="$1"
+  [[ -z "$svc" ]] && {
+    echo "Usage: dexec <service> [command]"
+    echo "  Runs a command inside a compose service (default: sh)."
+    return 1
+  }
   shift
   docker compose exec "$svc" "${@:-sh}"
 }
@@ -108,6 +116,17 @@ dclean-all() {
   docker system prune -af --volumes
 }
 
+dkill-all() {
+  _docker_guard || return
+  local n
+  n=$(docker ps -q 2>/dev/null | wc -l)
+  (( n > 0 )) || { echo "[docker] no running containers"; return 0; }
+  echo "⚠️  This will kill all $n running container(s)."
+  read "?Continue? [y/N]: " ans
+  [[ "$ans" == "y" ]] || return
+  docker kill $(docker ps -q) 2>/dev/null
+}
+
 # ---------- inspection ----------
 dinspect() {
   _docker_guard || return
@@ -120,11 +139,28 @@ dsize() {
 }
 
 # ---------- project utilities ----------
+# dreset-project — rebuilds the project's compose stack. Volume removal is
+# OPT-IN (pass --volumes, or set DRESET_VOLUMES=1); always confirms first.
 dreset-project() {
   _docker_guard || return
   _compose_guard || return
-  echo "Resetting project containers, volumes, and images…"
-  docker compose down -v
+
+  local do_volumes=0
+  case "$1" in
+    --volumes|-v) do_volumes=1 ;;
+  esac
+  [[ -n "$DRESET_VOLUMES" ]] && do_volumes=1
+
+  echo "⚠️  Rebuild: containers will be recreated; $( ((do_volumes)) && echo 'VOLUMES WILL BE REMOVED' || echo 'volumes are kept' )."
+  read "?Continue? [y/N]: " ans
+  [[ "$ans" == "y" ]] || return
+
+  echo "Resetting project containers, images…"
+  if (( do_volumes )); then
+    docker compose down -v
+  else
+    docker compose down
+  fi
   docker compose build --no-cache
   docker compose up -d
 }
@@ -135,11 +171,6 @@ dsh() {
   local c
   c=$(docker ps --format "{{.Names}}" | fzf)
   [[ -n "$c" ]] && docker exec -it "$c" sh
-}
-
-dkill-all() {
-  _docker_guard || return
-  docker kill $(docker ps -q) 2>/dev/null
 }
 
 # ---------- status ----------

@@ -2,24 +2,12 @@
 # VS Code Helpers (Drop-in, Hardened, jq-based)
 # Ubuntu / Safe / Deterministic
 # ============================================================
+[[ -n ${_ZSH_TOOL_VSCODE:-} ]] && return
+typeset -g _ZSH_TOOL_VSCODE=1
 
 # ----------------------------
-# Guards
+# Guards (_code_guard / _jq_guard provided by lib/utils.zsh)
 # ----------------------------
-
-_code_guard() {
-  command -v code >/dev/null 2>&1 || {
-    echo "[vscode] 'code' command not found (install VS Code + enable shell command)"
-    return 1
-  }
-}
-
-_jq_guard() {
-  command -v jq >/dev/null 2>&1 || {
-    echo "[vscode] jq is required but not installed"
-    return 1
-  }
-}
 
 # ----------------------------
 # Paths
@@ -95,8 +83,19 @@ code_settings_get() {
     echo "Usage: code_settings_get <json.key>"
     return 1
   }
+  [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$ ]] || {
+    echo "[vscode] invalid key (use a dotted JSON path, e.g. editor.fontSize)"
+    return 1
+  }
 
-  jq ".$key" "$(_vscode_settings)"
+  local f
+  f="$(_vscode_settings)"
+  [[ -f "$f" ]] || {
+    echo "[vscode] settings.json not found"
+    return 1
+  }
+
+  jq ".$key" "$f"
 }
 
 code_settings_set() {
@@ -107,6 +106,11 @@ code_settings_set() {
 
   [[ -z "$key" || -z "$value" ]] && {
     echo "Usage: code_settings_set <json.key> <json_value>"
+    echo "  json_value may be any JSON literal (\"str\", 42, true) or plain text"
+    return 1
+  }
+  [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$ ]] || {
+    echo "[vscode] invalid key (use a dotted JSON path, e.g. editor.fontSize)"
     return 1
   }
 
@@ -115,11 +119,16 @@ code_settings_set() {
   mkdir -p "$(dirname "$f")"
   [[ -f "$f" ]] || echo "{}" > "$f"
 
-  code_settings_backup
+  code_settings_backup || return 1
   tmp=$(mktemp)
   trap 'rm -f "$tmp"' EXIT
 
-  jq ".$key = $value" "$f" > "$tmp" && mv "$tmp" "$f"
+  # Values are passed as --arg/--argjson so the value can never inject jq code.
+  if jq -e . >/dev/null 2>&1 <<<"$value"; then
+    jq --argjson value "$value" ".${key} = \$value" "$f" > "$tmp" && mv "$tmp" "$f"
+  else
+    jq --arg value "$value" ".${key} = \$value" "$f" > "$tmp" && mv "$tmp" "$f"
+  fi
   echo "[vscode] Updated setting: $key"
 }
 

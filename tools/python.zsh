@@ -1,6 +1,8 @@
 # ============================================================
 # Python / Conda Helpers (Ubuntu, Manual, Project-Scoped)
 # ============================================================
+[[ -n ${_ZSH_TOOL_PYTHON:-} ]] && return
+typeset -g _ZSH_TOOL_PYTHON=1
 
 # ---------- internal helpers ----------
 _conda_root() {

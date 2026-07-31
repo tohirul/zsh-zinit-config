@@ -4,8 +4,8 @@
 # THIN ADAPTER ONLY
 #
 # Intelligence lives in:
-#   - ~/.agent/skills/vscode-opencode-workflow/SKILL.md
-#   - ~/.agent/skills/vscode-opencode-workflow/CONTRACT.md
+#   - ~/.agents/skills/vscode-opencode-workflow/SKILL.md
+#   - ~/.agents/skills/vscode-opencode-workflow/CONTRACT.md
 #   - scripts/*.zsh
 #   - plugins/*
 #
@@ -18,7 +18,16 @@
 
 # ------------------------------------------------------------
 # Guards (NO FALLBACKS, NO INFERENCE)
+# _code_guard provided by lib/utils.zsh
 # ------------------------------------------------------------
+[[ -n ${_ZSH_TOOL_OPENCODE:-} ]] && return
+typeset -g _ZSH_TOOL_OPENCODE=1
+
+# Configurable locations. Override in $ZSH_HOME/local.zsh (see local.zsh.example).
+: "${AGENT_SKILLS_HOME:=$HOME/.agents/skills}"
+: "${OPENCODE_WORKFLOW_ROOT:=$AGENT_SKILLS_HOME/vscode-opencode-workflow}"
+: "${OPENCODE_WORKFLOW_SCRIPTS:=$OPENCODE_WORKFLOW_ROOT/scripts}"
+export OPENCODE_WORKFLOW_ROOT OPENCODE_WORKFLOW_SCRIPTS
 
 _oc_guard() {
   command -v opencode >/dev/null 2>&1 || {
@@ -27,17 +36,18 @@ _oc_guard() {
   }
 }
 
-_code_guard() {
-  command -v code >/dev/null 2>&1 || {
-    echo "[opencode] ERROR: VS Code not found"
+_workflow_guard() {
+  [[ -n "$OPENCODE_WORKFLOW_ROOT" ]] || {
+    echo "[opencode] ERROR: OPENCODE_WORKFLOW_ROOT is unset"
+    echo "[opencode] Fix: set OPENCODE_WORKFLOW_ROOT in $ZSH_HOME/local.zsh"
+    echo "  (see local.zsh.example)"
     return 1
   }
-}
-
-_workflow_guard() {
   [[ -d "$OPENCODE_WORKFLOW_ROOT" ]] || {
     echo "[opencode] ERROR: Workflow root not found:"
     echo "  $OPENCODE_WORKFLOW_ROOT"
+    echo "[opencode] Fix: set OPENCODE_WORKFLOW_ROOT in $ZSH_HOME/local.zsh"
+    echo "  (or place the workflow at the conventional location above)"
     return 1
   }
 }
@@ -254,6 +264,7 @@ oc_review_js() {
 oc_save() {
   echo "❌ SAVE cannot be triggered from shell"
   echo "→ Allowed only after verification"
+  return 1
 }
 
 oc_check() {
