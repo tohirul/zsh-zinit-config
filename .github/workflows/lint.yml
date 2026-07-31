@@ -83,7 +83,7 @@ jobs:
 
       - name: No dangerous startup patterns in zsh_backuprc.zsh
         run: |
-          if grep -RInE 'unalias[[:space:]]+-m|source.*nvm\.sh|conda shell\.zsh hook|curl.*\|.*(sh|bash|zsh)|wget.*\|.*(sh|bash|zsh)' zsh_backuprc.zsh; then
+          if grep -v '^\s*#' zsh_backuprc.zsh | grep -InE 'unalias[[:space:]]+-m|source.*nvm\.sh|conda shell\.zsh hook|curl.*\|.*(sh|bash|zsh)|wget.*\|.*(sh|bash|zsh)'; then
             echo "ERROR: startup orchestrator contains a dangerous pattern (see above)"
             exit 1
           fi
