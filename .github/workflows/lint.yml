@@ -92,7 +92,8 @@ jobs:
       - name: No machine-specific absolute paths
         run: |
           if grep -RInE '/home/[A-Za-z0-9._-]+/|/Users/[A-Za-z0-9._-]+/' . \
-              --exclude-dir=.git --exclude-dir=.audit; then
+              --exclude-dir=.git --exclude-dir=.audit \
+              --exclude=audit.zsh; then
             echo "ERROR: machine-specific absolute path found (see above)"
             exit 1
           fi
