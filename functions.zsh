@@ -4,19 +4,26 @@
 [[ -n ${_ZSH_FUNCTIONS:-} ]] && return
 typeset -g _ZSH_FUNCTIONS=1
 
-# NOTE: zoxide is initialized once at the end of ~/.zshrc (not here) so its
-# precmd hook stays last, which is what `zoxide doctor` expects.
+# NOTE: zoxide is initialized once by the zinit zoxide plugin (zoxide.plugin.zsh),
+# and the `cd` -> `z` replacement is restored via that plugin's atload hook.
+# It is intentionally not re-initialized here to avoid double init.
 
 # ---------- fzf helpers ----------
 fzf_cd() {
+  _fzf_guard || return 1
   local dir
-  dir=$(find . -type d -not -path '*/\.git/*' 2>/dev/null | fzf)
+  dir=$(find . -type d \
+    \( -name '.git' -o -name 'node_modules' -o -name '.venv' -o -name 'venv' \) \
+    -prune -o -type d -print 2>/dev/null | fzf)
   [[ -n "$dir" ]] && cd "$dir"
 }
 
 fzf_file() {
+  _fzf_guard || return 1
   local file
-  file=$(find . -type f 2>/dev/null | fzf)
+  file=$(find . -type f \
+    \( -path './.git/*' -o -path './node_modules/*' -o -path './.venv/*' -o -path './venv/*' \) \
+    -prune -o -type f -print 2>/dev/null | fzf)
   [[ -n "$file" ]] && ${EDITOR:-nano} "$file"
 }
 
@@ -30,32 +37,91 @@ dev_init() {
 
 # In functions.zsh
 
+# dev_clean — removes build/cache artifacts. Safe by default: it only prints
+# what would be removed unless --force/-f is given. Never deletes source dirs.
 dev_clean() {
-  info "Cleaning multi-stack artifacts..."
-  # Node/Next.js
-  [[ -d node_modules ]] && rm -rf node_modules
-  [[ -d .next ]] && rm -rf .next
-  # Python
-  find . -type d -name "__pycache__" -exec rm -rf {} +
-  find . -type d -name ".pytest_cache" -exec rm -rf {} +
-  # Go/General
-  [[ -d dist ]] && rm -rf dist
-  [[ -d build ]] && rm -rf build
-  [[ -f coverage.out ]] && rm coverage.out
+  local mode="dry-run"
+  case "$1" in
+    -f|--force) mode="exec" ;;
+    -n|--dry-run) mode="dry-run" ;;
+    -h|--help)
+      echo "Usage: dev_clean [-n|--dry-run] [-f|--force]"
+      echo "  Removes multi-stack build/cache artifacts."
+      echo "  Without --force only lists what would be removed."
+      return 0
+      ;;
+  esac
+
+  local targets=(
+    node_modules
+    .next
+    dist
+    build
+    coverage.out
+  )
+
+  [[ "$mode" == "exec" ]] && info "Cleaning multi-stack artifacts..."
+  [[ "$mode" == "dry-run" ]] && warn "Dry-run: use --force to actually remove."
+
+  local t rc=0
+  for t in "${targets[@]}"; do
+    if [[ -e "$t" ]]; then
+      if [[ "$mode" == "exec" ]]; then
+        rm -rf -- "$t"
+        info "Removed $t"
+      else
+        echo "  would remove: $t"
+      fi
+    fi
+  done
+
+  # Python caches: find-based, always scoped to the current project.
+  local dirs=()
+  find . -type d \
+    \( -name '__pycache__' -o -name '.pytest_cache' \) \
+    -not -path './node_modules/*' -not -path './.git/*' \
+    -print0 2>/dev/null |
+  while IFS= read -r -d '' d; do
+    if [[ "$mode" == "exec" ]]; then
+      rm -rf -- "$d"
+      info "Removed $d"
+    else
+      echo "  would remove: $d"
+    fi
+  done
+
+  return "$rc"
 }
 
+# dev_health — authoritative tooling status. Exit code 0 when every required
+# tool is present, 1 otherwise. (Single canonical definition; the duplicate in
+# tools/system.zsh has been removed.)
 dev_health() {
-  echo "🔍 Dev Health Check"
-  echo "Node:   $(command -v node >/dev/null && node -v || echo missing)"
-  echo "Python: $(command -v python >/dev/null && python --version || echo missing)"
-  echo "Docker: $(command -v docker >/dev/null && docker --version || echo missing)"
-  echo "Git:    $(command -v git >/dev/null && git --version || echo missing)"
+  echo "🔎 Dev environment health"
+  local t version missing=0
+
+  for t in node python docker git; do
+    if command -v "$t" >/dev/null 2>&1; then
+      version=$("$t" --version 2>/dev/null | head -1)
+      print -P "  %F{green}OK%f      $t  (${version:-available})"
+    else
+      print -P "  %F{red}MISSING%f $t"
+      missing=1
+    fi
+  done
+
+  [[ "$missing" -eq 0 ]] && echo "All required tools present."
+  return "$missing"
 }
 
 # ---------- project detection ----------
 project_type() {
   [[ -f package.json ]] && echo "node" && return
-  [[ -f docker-compose.yml ]] && echo "docker" && return
+  [[ -f Cargo.toml ]] && echo "rust" && return
+  [[ -f go.mod ]] && echo "go" && return
+  for f in compose.yaml compose.yml docker-compose.yml docker-compose.yaml; do
+    [[ -f "$f" ]] && echo "docker" && return
+  done
   [[ -f environment.yml ]] && echo "conda" && return
   echo "unknown"
 }

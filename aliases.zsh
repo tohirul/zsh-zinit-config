@@ -33,7 +33,6 @@ alias dc='docker compose'
 
 # ----- python -----
 alias py='python'
-alias pip='pip'
 
 # ----- system -----
 alias ports='ss -tulpn'

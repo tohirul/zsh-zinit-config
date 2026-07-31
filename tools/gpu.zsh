@@ -18,12 +18,16 @@ _prime_session() {
 }
 
 # ---------- PRIME environment ----------
+# Runs a command with the NVIDIA PRIME offload environment set for THAT
+# command only. Never exports into the caller's shell (no env leaks).
 _prime_env() {
-  export __NV_PRIME_RENDER_OFFLOAD=1
-  export __GLX_VENDOR_LIBRARY_NAME=nvidia
-  export __VK_LAYER_NV_optimus=NVIDIA_only
-  export LIBVA_DRIVER_NAME=nvidia
-  export VDPAU_DRIVER=nvidia
+  env \
+    __NV_PRIME_RENDER_OFFLOAD=1 \
+    __GLX_VENDOR_LIBRARY_NAME=nvidia \
+    __VK_LAYER_NV_optimus=NVIDIA_only \
+    LIBVA_DRIVER_NAME=nvidia \
+    VDPAU_DRIVER=nvidia \
+    "$@"
 }
 
 # ---------- info ----------
@@ -62,8 +66,7 @@ prun() {
     return 1
   fi
 
-  _prime_env
-  "$@"
+  _prime_env "$@"
 }
 
 prun-gl() {
@@ -77,8 +80,7 @@ prun-gl() {
     return 1
   fi
 
-  _prime_env
-  "$@" --use-gl=desktop
+  _prime_env "$@" --use-gl=desktop
 }
 
 prun-vk() {
@@ -92,8 +94,7 @@ prun-vk() {
     return 1
   fi
 
-  _prime_env
-  "$@" \
+  _prime_env "$@" \
     --enable-features=Vulkan \
     --use-vulkan
 }
@@ -118,9 +119,7 @@ codevk() {
     return 1
   fi
 
-  _prime_env
-
-  code "$@" \
+  _prime_env code "$@" \
     --enable-features=Vulkan \
     --ignore-gpu-blocklist \
     --disable-software-rasterizer
@@ -132,9 +131,7 @@ chromegpu() {
     return 1
   fi
 
-  _prime_env
-
-  google-chrome-stable "$@" \
+  _prime_env google-chrome-stable "$@" \
     --ignore-gpu-blocklist \
     --enable-gpu-rasterization \
     --enable-zero-copy
@@ -146,9 +143,7 @@ chromevk() {
     return 1
   fi
 
-  _prime_env
-
-  google-chrome-stable "$@" \
+  _prime_env google-chrome-stable "$@" \
     --ignore-gpu-blocklist \
     --enable-gpu-rasterization \
     --enable-zero-copy \
@@ -166,6 +161,5 @@ prime-top() {
 }
 
 prime-test() {
-  _prime_env
-  glxinfo | grep "OpenGL renderer"
+  _prime_env glxinfo | grep "OpenGL renderer"
 }

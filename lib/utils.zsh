@@ -19,3 +19,10 @@ _code_guard() {
     return 1
   }
 }
+
+_fzf_guard() {
+  command -v fzf >/dev/null 2>&1 || {
+    echo "[utils] fzf is required but not installed"
+    return 1
+  }
+}

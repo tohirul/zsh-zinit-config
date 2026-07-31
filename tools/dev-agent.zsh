@@ -15,32 +15,55 @@ _agent_guard() {
   _workflow_guard || return 1
 
   [[ -f "ai.project.json" ]] || {
-    echo "[agent] Missing ai.project.json"
+    echo "[agent] ERROR: Missing ai.project.json in $(pwd)"
     echo "→ run: oc_context_generate"
     return 1
   }
 
-  [[ -f "$OPENCODE_WORKFLOW_ROOT/CONTRACT.md" ]] || {
-    echo "[agent] Missing CONTRACT.md"
+  local contract_file="$OPENCODE_WORKFLOW_ROOT/CONTRACT.md"
+  [[ -f "$contract_file" ]] || {
+    echo "[agent] ERROR: Missing CONTRACT.md:"
+    echo "  $contract_file"
+    echo "→ point OPENCODE_WORKFLOW_ROOT at a checked-out workflow"
+    echo "  (set in $ZSH_HOME/local.zsh, see local.zsh.example)"
     return 1
   }
 
   # Optional hash-lock enforcement
   if [[ -f "$OPENCODE_WORKFLOW_ROOT/.contract.sha256" ]]; then
     command -v sha256sum >/dev/null 2>&1 || {
-      echo "[agent] sha256sum not found"
+      echo "[agent] ERROR: sha256sum not found"
       return 1
     }
     local current locked
-    current=$(sha256sum "$OPENCODE_WORKFLOW_ROOT/CONTRACT.md" | awk '{print $1}')
+    current=$(sha256sum "$contract_file" | awk '{print $1}')
     locked=$(awk '{print $1}' "$OPENCODE_WORKFLOW_ROOT/.contract.sha256")
 
     [[ "$current" != "$locked" ]] && {
-      echo "[agent] CONTRACT.md hash mismatch"
-      echo "→ governance violation"
+      echo "[agent] ERROR: CONTRACT.md hash mismatch (governance violation)"
+      echo "  expected: $locked"
+      echo "  current:  $current"
+      echo "→ refresh the lock only after an approved contract change:"
+      echo "  oc_contract_verify > $OPENCODE_WORKFLOW_ROOT/.contract.sha256"
       return 1
     }
   fi
+}
+
+# AGENT_SCOPE validation for write-intent commands (relative, non-escaping)
+_scope_guard() {
+  [[ -n "$AGENT_SCOPE" ]] || {
+    echo "[agent] ERROR: AGENT_SCOPE is empty"
+    echo "Example:"
+    echo "  export AGENT_SCOPE='src/domain/*'"
+    return 1
+  }
+  if [[ "$AGENT_SCOPE" == /* || "$AGENT_SCOPE" == *..* ]]; then
+    echo "[agent] ERROR: AGENT_SCOPE must be a relative path without '..':"
+    echo "  got: $AGENT_SCOPE"
+    return 1
+  fi
+  return 0
 }
 
 # ------------------------------------------------------------
@@ -122,13 +145,7 @@ agent_schema_validate() {
 
 agent_schema_generate() {
   _agent_guard || return
-
-  [[ -z "$AGENT_SCOPE" ]] && {
-    echo "[agent] Missing AGENT_SCOPE"
-    echo "Example:"
-    echo "  export AGENT_SCOPE='src/schema/*'"
-    return 1
-  }
+  _scope_guard || return
 
   local -x AGENT_INTENT="code_generation"
 
@@ -162,13 +179,7 @@ agent_schema_architecture() {
 
 agent_refactor() {
   _agent_guard || return
-
-  [[ -z "$AGENT_SCOPE" ]] && {
-    echo "[agent] Missing AGENT_SCOPE"
-    echo "Example:"
-    echo "  export AGENT_SCOPE='src/domain/*'"
-    return 1
-  }
+  _scope_guard || return
 
   local -x AGENT_INTENT="refactor"
 

@@ -136,11 +136,5 @@ dev_ports() {
   ss -tulpn | grep -E ':(3000|3001|4000|5000|5173|8000|8080|9229)'
 }
 
-dev_health() {
-  echo "🔎 Dev environment health"
-  echo
-  echo "Node: $(command -v node >/dev/null && node -v || echo missing)"
-  echo "Python: $(command -v python >/dev/null && python --version || echo missing)"
-  echo "Docker: $(command -v docker >/dev/null && docker --version || echo missing)"
-  echo "Git: $(command -v git >/dev/null && git --version || echo missing)"
-}
+# NOTE: dev_health is defined canonically in functions.zsh (authoritative,
+# with exit-code reporting). Do not redefine it here.

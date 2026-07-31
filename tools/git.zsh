@@ -52,18 +52,51 @@ gcb() {
 }
 
 # ---------- safe cleanup ----------
-# In tools/git.zsh
-
+# gclean-merged — lists branches already merged into the default branch.
+# Safe by default: only prints candidates. Pass -f/--prune to actually delete
+# (git branch -d refuses to delete unmerged or checked-out branches anyway).
 gclean-merged() {
   _git_guard && _repo_guard || return
-  # Dynamically find the default branch (main/master/etc)
-  local base=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
-  git fetch -p
-  # Match whole branch names only (leading "  " or "* " then exact name)
-  git branch --merged "$base" \
+
+  local base="${1:-}"
+  if [[ -z "$base" || "$base" == "-f" || "$base" == "--prune" ]]; then
+    base=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null)
+    base="${base#origin/}"
+    [[ -z "$base" || "$base" == "HEAD" ]] && base=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  fi
+  [[ -n "$base" && "$base" != "HEAD" ]] || {
+    echo "[git] cannot determine the default branch (pass one: gclean-merged main)"
+    return 1
+  }
+
+  local prune=0
+  [[ "$1" == "-f" || "$1" == "--prune" ]] && prune=1
+
+  git fetch -p 2>/dev/null || true
+
+  local merged
+  merged=$(git branch --merged "$base" 2>/dev/null \
     | sed 's/^[* ] *//' \
-    | grep -Ev "^(${base}|dev|develop|staging|main|master)$" \
-    | xargs -r git branch -d
+    | grep -Ev "^(HEAD|${base}|dev|develop|staging|main|master)$" \
+    | grep -v '^$' || true)
+
+  if [[ -z "$merged" ]]; then
+    echo "[git] no merged branches to clean (base: $base)"
+    return 0
+  fi
+
+  echo "Merged branches (base: $base):"
+  echo "$merged" | sed 's/^/  - /'
+  echo "Current branch: $(git rev-parse --abbrev-ref HEAD)"
+
+  if (( ! prune )); then
+    echo "[git] Dry-run: re-run with -f (or --prune) to delete."
+    return 0
+  fi
+
+  echo "$merged" | while read -r b; do
+    [[ -n "$b" ]] && git branch -d "$b"
+  done
 }
 # ---------- stash ----------
 gstash() {
@@ -116,14 +149,17 @@ gbisect-start() {
 }
 
 gbisect-good() {
+  _git_guard && _repo_guard || return
   git bisect good
 }
 
 gbisect-bad() {
+  _git_guard && _repo_guard || return
   git bisect bad
 }
 
 gbisect-reset() {
+  _git_guard && _repo_guard || return
   git bisect reset
 }
 
